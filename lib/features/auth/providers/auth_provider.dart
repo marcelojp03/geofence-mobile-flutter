@@ -63,15 +63,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Verifica si hay una sesión activa
   Future<void> checkAuthStatus() async {
     try {
-      final isAuth = await _repository.isAuthenticated();
-      if (isAuth) {
-        // TODO: En producción, validar token con el servidor y obtener datos del usuario
-        // Por ahora, solo marcamos como no autenticado si no hay token
-        // Podrías guardar los datos del usuario en SharedPreferences
-        state = AuthState.unauthenticated();
-      } else {
-        state = AuthState.unauthenticated();
+      final isValid = await _repository.checkSession();
+      if (isValid) {
+        // Obtener datos del usuario
+        final response = await _repository.getProfile();
+        if (response.isSuccess && response.data != null) {
+          state = AuthState.authenticated(response.data!);
+          return;
+        }
       }
+      state = AuthState.unauthenticated();
     } catch (e) {
       state = AuthState.unauthenticated();
     }
@@ -93,21 +94,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.isSuccess && response.data != null) {
         final loginData = response.data!;
-
-        // Crear usuario desde la respuesta
-        final user = User(
-          id: loginData.userId ?? '',
-          email: loginData.email,
-          nombres: loginData.nombres,
-          apellidoP: loginData.apellidoP,
-          apellidoM: loginData.apellidoM,
-          token: loginData.token,
-        );
-
-        state = AuthState.authenticated(user);
+        state = AuthState.authenticated(loginData.user);
         return true;
       } else {
-        state = AuthState.unauthenticated(response.mensaje);
+        state = AuthState.unauthenticated(response.message);
+        return false;
+      }
+    } catch (e) {
+      state = AuthState.unauthenticated('Error inesperado: ${e.toString()}');
+      return false;
+    }
+  }
+
+  /// Registra un nuevo usuario
+  Future<bool> register({
+    required int schoolId,
+    required String email,
+    required String password,
+    required String fullName,
+    String? phone,
+  }) async {
+    try {
+      state = state.copyWith(errorMessage: null);
+
+      final response = await _repository.register(
+        schoolId: schoolId,
+        email: email,
+        password: password,
+        fullName: fullName,
+        phone: phone,
+      );
+
+      if (response.isSuccess) {
+        // Después de registrar, hacer login automático
+        return await loginUser(email: email, password: password);
+      } else {
+        state = AuthState.unauthenticated(response.message);
         return false;
       }
     } catch (e) {

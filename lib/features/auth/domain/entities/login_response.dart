@@ -1,44 +1,23 @@
-/// Respuesta del endpoint de login
-class LoginResponse {
-  final String email;
-  final String token;
-  final String? userId;
-  final String? nombres;
-  final String? apellidoP;
-  final String? apellidoM;
+import 'user.dart';
 
-  const LoginResponse({
-    required this.email,
-    required this.token,
-    this.userId,
-    this.nombres,
-    this.apellidoP,
-    this.apellidoM,
-  });
+/// Respuesta del endpoint /auth/login
+class LoginResponse {
+  final String accessToken;
+  final User user;
+
+  const LoginResponse({required this.accessToken, required this.user});
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
-      email: json['email'] as String? ?? '',
-      token: json['token'] as String? ?? '',
-      userId: json['id']?.toString() ?? json['_id']?.toString(),
-      nombres: json['nombres'] as String?,
-      apellidoP: json['apellidoP'] as String?,
-      apellidoM: json['apellidoM'] as String?,
+      accessToken: json['accessToken'] as String,
+      user: User.fromJson(json['user'] as Map<String, dynamic>),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-      'token': token,
-      if (userId != null) 'id': userId,
-      if (nombres != null) 'nombres': nombres,
-      if (apellidoP != null) 'apellidoP': apellidoP,
-      if (apellidoM != null) 'apellidoM': apellidoM,
-    };
+    return {'accessToken': accessToken, 'user': user.toJson()};
   }
 
   @override
-  String toString() =>
-      'LoginResponse(email: $email, token: ${token.substring(0, 10)}...)';
+  String toString() => 'LoginResponse(user: ${user.email})';
 }

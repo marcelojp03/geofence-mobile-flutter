@@ -1,52 +1,71 @@
+import 'school.dart';
+
+/// Rol del usuario en el sistema
+enum UserRole {
+  schoolAdmin('SCHOOL_ADMIN'),
+  parent('PARENT');
+
+  final String value;
+  const UserRole(this.value);
+
+  static UserRole fromString(String value) {
+    return UserRole.values.firstWhere(
+      (role) => role.value == value,
+      orElse: () => UserRole.parent,
+    );
+  }
+}
+
 /// Entidad de Usuario
 /// Representa al usuario autenticado en la aplicación
 class User {
-  final String id;
+  final int id;
   final String email;
-  final String? nombres;
-  final String? apellidoP;
-  final String? apellidoM;
-  final String token;
+  final String fullName;
+  final String? phone;
+  final UserRole role;
+  final int schoolId;
+  final School? school;
+  final String status;
 
   const User({
     required this.id,
     required this.email,
-    this.nombres,
-    this.apellidoP,
-    this.apellidoM,
-    required this.token,
+    required this.fullName,
+    this.phone,
+    required this.role,
+    required this.schoolId,
+    this.school,
+    this.status = 'ACTIVE',
   });
-
-  /// Nombre completo del usuario
-  String get fullName {
-    final parts = [
-      nombres,
-      apellidoP,
-      apellidoM,
-    ].where((s) => s != null && s.isNotEmpty).toList();
-    return parts.isNotEmpty ? parts.join(' ') : email;
-  }
 
   /// Iniciales para avatar
   String get initials {
-    if (nombres != null && nombres!.isNotEmpty) {
-      final first = nombres![0].toUpperCase();
-      if (apellidoP != null && apellidoP!.isNotEmpty) {
-        return '$first${apellidoP![0].toUpperCase()}';
-      }
-      return first;
+    final parts = fullName.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return email.isNotEmpty ? email[0].toUpperCase() : '?';
+    return fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
   }
+
+  /// Verifica si es administrador del colegio
+  bool get isAdmin => role == UserRole.schoolAdmin;
+
+  /// Verifica si es padre
+  bool get isParent => role == UserRole.parent;
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
-      email: json['email'] as String? ?? '',
-      nombres: json['nombres'] as String?,
-      apellidoP: json['apellidoP'] as String?,
-      apellidoM: json['apellidoM'] as String?,
-      token: json['token'] as String? ?? '',
+      id: json['id'] as int,
+      email: json['email'] as String,
+      fullName: json['fullName'] as String,
+      phone: json['phone'] as String?,
+      role: UserRole.fromString(json['role'] as String? ?? 'PARENT'),
+      schoolId: json['schoolId'] as int,
+      school: json['school'] != null
+          ? School.fromJson(json['school'] as Map<String, dynamic>)
+          : null,
+      status: json['status'] as String? ?? 'ACTIVE',
     );
   }
 
@@ -54,33 +73,40 @@ class User {
     return {
       'id': id,
       'email': email,
-      'nombres': nombres,
-      'apellidoP': apellidoP,
-      'apellidoM': apellidoM,
-      'token': token,
+      'fullName': fullName,
+      if (phone != null) 'phone': phone,
+      'role': role.value,
+      'schoolId': schoolId,
+      if (school != null) 'school': school!.toJson(),
+      'status': status,
     };
   }
 
   User copyWith({
-    String? id,
+    int? id,
     String? email,
-    String? nombres,
-    String? apellidoP,
-    String? apellidoM,
-    String? token,
+    String? fullName,
+    String? phone,
+    UserRole? role,
+    int? schoolId,
+    School? school,
+    String? status,
   }) {
     return User(
       id: id ?? this.id,
       email: email ?? this.email,
-      nombres: nombres ?? this.nombres,
-      apellidoP: apellidoP ?? this.apellidoP,
-      apellidoM: apellidoM ?? this.apellidoM,
-      token: token ?? this.token,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      schoolId: schoolId ?? this.schoolId,
+      school: school ?? this.school,
+      status: status ?? this.status,
     );
   }
 
   @override
-  String toString() => 'User(id: $id, email: $email, fullName: $fullName)';
+  String toString() =>
+      'User(id: $id, email: $email, fullName: $fullName, role: ${role.value})';
 
   @override
   bool operator ==(Object other) {
