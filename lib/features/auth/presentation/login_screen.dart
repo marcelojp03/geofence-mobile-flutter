@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../config/theme/app_theme.dart';
 import '../../../shared/utils/responsive.dart';
 import '../../../shared/widgets/widgets.dart';
+// TODO: Descomentar cuando Firebase esté configurado
+// import '../../notifications/providers/fcm_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/login_form_provider.dart';
 
@@ -38,7 +40,7 @@ class LoginScreen extends ConsumerWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+                  physics: const ClampingScrollPhysics(),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: constraints.maxHeight,
@@ -110,14 +112,12 @@ class LoginScreen extends ConsumerWidget {
                               textAlign: TextAlign.center,
                             ),
 
-                            SizedBox(height: r.hp(4)),
+                            SizedBox(height: r.hp(3)),
 
                             // Formulario en GlassCard
                             const _LoginForm(),
 
-                            SizedBox(height: r.hp(3)),
-
-                            const Spacer(),
+                            SizedBox(height: r.hp(2)),
                           ],
                         ),
                       ),
@@ -226,32 +226,6 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
             isLoading: loginForm.isPosting,
             onPressed: loginForm.isPosting ? null : _handleSubmit,
             buttonColor: AppTheme.primaryColor,
-          ),
-
-          SizedBox(height: AppTheme.spacingLarge),
-
-          // Enlace de registro
-          Center(
-            child: GestureDetector(
-              onTap: () {
-                // TODO: Navegar a registro
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Registro próximamente...'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              child: Text(
-                '¿No tienes cuenta? Regístrate',
-                style: TextStyle(
-                  color: linkColor,
-                  fontSize: r.dp(1.6),
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
           ),
         ],
       ),
@@ -370,6 +344,11 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (!context.mounted) return;
       Navigator.of(context).pop(); // Cerrar dialog
+
+      // TODO: Descomentar cuando Firebase esté configurado
+      // Registrar FCM token en el backend (no bloqueante)
+      // ref.read(fcmTokenNotifierProvider.notifier).registerToken();
+
       context.go('/parent');
     });
   }

@@ -1,13 +1,38 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'config/env.dart';
 import 'config/router/app_router.dart';
 import 'config/theme/app_theme.dart';
+import 'core/services/notification_service.dart';
+import 'features/child_mode/background/background_tracking_service.dart';
 import 'shared/providers/theme_notifier.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar variables de entorno
+  await Env.init();
+
+  // Inicializar Firebase con opciones del google-services.json
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: 'AIzaSyBKG8INmeEfgbEJXBA_mwWFpbZyr2qNL3E',
+      appId: '1:428170519402:android:2a1d6097d0fbcc5b87bb13',
+      messagingSenderId: '428170519402',
+      projectId: 'geofence-sig',
+      storageBucket: 'geofence-sig.firebasestorage.app',
+    ),
+  );
+
+  // Inicializar servicio de notificaciones
+  await NotificationService().init();
+
+  // Inicializar WorkManager para background tracking
+  await BackgroundTrackingService().init();
+
   runApp(const ProviderScope(child: MainApp()));
 }
 

@@ -4,6 +4,8 @@ import 'package:geofence_mobile_flutter/features/mode_selector/presentation/mode
 import 'package:geofence_mobile_flutter/features/auth/presentation/login_screen.dart';
 import 'package:geofence_mobile_flutter/features/parent/presentation/home_parent_screen.dart';
 import 'package:geofence_mobile_flutter/features/child_mode/presentation/tracking_screen.dart';
+import 'package:geofence_mobile_flutter/features/child_mode/presentation/child_setup_screen.dart';
+import 'package:geofence_mobile_flutter/features/children/presentation/child_detail_screen.dart';
 
 /// Router principal de la aplicación
 final appRouter = GoRouter(
@@ -37,10 +39,27 @@ final appRouter = GoRouter(
       builder: (context, state) => const HomeParentScreen(),
     ),
 
-    // Modo hijo - Tracking
+    // Detalle de un hijo
+    GoRoute(
+      path: '/children/:id',
+      name: 'child-detail',
+      builder: (context, state) {
+        final childId = int.parse(state.pathParameters['id']!);
+        return ChildDetailScreen(childId: childId);
+      },
+    ),
+
+    // Modo hijo - Configuración inicial (vincular dispositivo)
     GoRoute(
       path: '/child/setup',
-      name: 'child-setup',
+      name: ChildSetupScreen.name,
+      builder: (context, state) => const ChildSetupScreen(),
+    ),
+
+    // Modo hijo - Pantalla de tracking activo
+    GoRoute(
+      path: '/child/tracking',
+      name: TrackingScreen.name,
       builder: (context, state) => const TrackingScreen(),
     ),
   ],

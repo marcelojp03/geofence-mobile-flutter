@@ -25,6 +25,9 @@
     <!-- Vibration for alerts -->
     <uses-permission android:name="android.permission.VIBRATE"/>
     
+    <!-- Camera for QR code scanning -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    
     <!-- Battery optimization exemption request -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 

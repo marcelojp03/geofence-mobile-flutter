@@ -167,3 +167,13 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
   return AuthNotifier(repository);
 });
+
+/// Provider para obtener el usuario actual
+final currentUserProvider = Provider<User?>((ref) {
+  return ref.watch(authProvider).user;
+});
+
+/// Provider para verificar si está autenticado
+final isAuthenticatedProvider = Provider<bool>((ref) {
+  return ref.watch(authProvider).isAuthenticated;
+});

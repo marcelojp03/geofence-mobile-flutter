@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "428170519402",
+    "project_id": "geofence-sig",
+    "storage_bucket": "geofence-sig.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:428170519402:android:2a1d6097d0fbcc5b87bb13",
+        "android_client_info": {
+          "package_name": "com.example.geofence_mobile_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKG8INmeEfgbEJXBA_mwWFpbZyr2qNL3E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

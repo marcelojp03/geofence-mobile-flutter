@@ -54,6 +54,10 @@
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Esta app necesita acceso continuo a tu ubicación para enviar alertas cuando tu hijo entra o sale de zonas seguras.</string>
 	
+	<!-- Camera Permission for QR Scanner -->
+	<key>NSCameraUsageDescription</key>
+	<string>Esta app necesita acceso a la cámara para escanear códigos QR y vincular el dispositivo.</string>
+	
 	<!-- Background Modes -->
 	<key>UIBackgroundModes</key>
 	<array>

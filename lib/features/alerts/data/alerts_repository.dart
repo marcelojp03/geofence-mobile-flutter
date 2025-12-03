@@ -82,6 +82,42 @@ class AlertsRepository {
     }
   }
 
+  /// Obtiene alertas de un hijo específico (filtro local)
+  /// Usa GET /alerts/my-alerts y filtra por childId
+  Future<ApiResponse<List<Alert>>> getAlertsByChild(int childId) async {
+    try {
+      final response = await _api.get('/alerts/my-alerts');
+      final json = response.data as Map<String, dynamic>;
+
+      if (json['success'] == true) {
+        final List<dynamic> data = json['data'] as List;
+        final alerts = data
+            .map((item) => Alert.fromJson(item as Map<String, dynamic>))
+            .where((alert) => alert.childId == childId)
+            .toList();
+
+        return ApiResponse<List<Alert>>(
+          success: true,
+          message: json['message'] ?? 'OK',
+          data: alerts,
+        );
+      }
+
+      return ApiResponse<List<Alert>>(
+        success: false,
+        message: json['message'] ?? 'Error al obtener alertas del hijo',
+      );
+    } on DioException catch (e) {
+      return _handleError<List<Alert>>(e);
+    } catch (e) {
+      developer.log('Error: $e', name: 'AlertsRepository');
+      return ApiResponse<List<Alert>>(
+        success: false,
+        message: 'Error inesperado: ${e.toString()}',
+      );
+    }
+  }
+
   /// Marca una alerta como leída
   /// PATCH /alerts/:id/mark-read
   Future<ApiResponse<void>> markAsRead(int alertId) async {
