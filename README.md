@@ -12,7 +12,7 @@ Mobile application for real-time child location tracking and geofence monitoring
 
 ## Features
 
-### Parent Mode 👨‍👩‍👧
+### Parent Mode
 - **Login/Authentication** with JWT
 - **View children list** with status indicators
 - **Real-time location** on interactive map
@@ -21,7 +21,7 @@ Mobile application for real-time child location tracking and geofence monitoring
 - **QR code generation** for device pairing
 - **Push notifications** via Firebase Cloud Messaging
 
-### Child Mode 📱
+### Child Mode
 - **QR code scanning** for quick device setup
 - **Foreground tracking** every 30 seconds
 - **Background tracking** via WorkManager (~15 min intervals)

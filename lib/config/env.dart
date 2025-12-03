@@ -36,6 +36,20 @@ class Env {
   static int get defaultSchoolId =>
       int.tryParse(dotenv.env['DEFAULT_SCHOOL_ID'] ?? '1') ?? 1;
 
+  // Firebase configuration
+  static String get firebaseApiKey => dotenv.env['FIREBASE_API_KEY'] ?? '';
+
+  static String get firebaseAppId => dotenv.env['FIREBASE_APP_ID'] ?? '';
+
+  static String get firebaseMessagingSenderId =>
+      dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '';
+
+  static String get firebaseProjectId =>
+      dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
+
+  static String get firebaseStorageBucket =>
+      dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '';
+
   // Keys para SharedPreferences
   static const String tokenKey = 'auth_token';
   static const String deviceUidKey = 'device_uid';

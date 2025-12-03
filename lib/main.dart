@@ -16,14 +16,14 @@ void main() async {
   // Inicializar variables de entorno
   await Env.init();
 
-  // Inicializar Firebase con opciones del google-services.json
+  // Inicializar Firebase con opciones desde variables de entorno
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'AIzaSyBKG8INmeEfgbEJXBA_mwWFpbZyr2qNL3E',
-      appId: '1:428170519402:android:2a1d6097d0fbcc5b87bb13',
-      messagingSenderId: '428170519402',
-      projectId: 'geofence-sig',
-      storageBucket: 'geofence-sig.firebasestorage.app',
+    options: FirebaseOptions(
+      apiKey: Env.firebaseApiKey,
+      appId: Env.firebaseAppId,
+      messagingSenderId: Env.firebaseMessagingSenderId,
+      projectId: Env.firebaseProjectId,
+      storageBucket: Env.firebaseStorageBucket,
     ),
   );
 
