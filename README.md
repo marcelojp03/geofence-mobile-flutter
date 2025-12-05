@@ -23,8 +23,9 @@ Mobile application for real-time child location tracking and geofence monitoring
 
 ### Child Mode
 - **QR code scanning** for quick device setup
-- **Foreground tracking** every 30 seconds
-- **Background tracking** via WorkManager (~15 min intervals)
+- **Foreground service** with persistent notification (every 30 seconds)
+- **Background tracking** via WorkManager as backup (~15 min intervals)
+- **Battery optimization** dialog to ensure reliable tracking
 - **Battery level** reporting
 - **Automatic device registration** with backend
 
@@ -167,7 +168,7 @@ lib/
 | **HTTP Client** | Dio 5.x |
 | **Maps** | flutter_map + OpenStreetMap |
 | **Location** | Geolocator 13.x |
-| **Background Tasks** | WorkManager |
+| **Background Tasks** | flutter_background_service + WorkManager |
 | **Push Notifications** | Firebase Cloud Messaging |
 | **QR Code** | mobile_scanner + qr_flutter |
 | **Storage** | SharedPreferences |
@@ -184,6 +185,10 @@ lib/
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+<uses-permission android:name="android.permission.WAKE_LOCK"/>
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 <uses-permission android:name="android.permission.CAMERA"/>
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 ```

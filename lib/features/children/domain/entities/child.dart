@@ -20,7 +20,7 @@ enum ChildStatus {
 class Child {
   final int id;
   final String fullName;
-  final int age;
+  final int? age;
   final String grade;
   final ChildStatus status;
   final int? parentId;
@@ -31,7 +31,7 @@ class Child {
   const Child({
     required this.id,
     required this.fullName,
-    required this.age,
+    this.age,
     required this.grade,
     this.status = ChildStatus.active,
     this.parentId,
@@ -44,8 +44,8 @@ class Child {
     return Child(
       id: json['id'] as int,
       fullName: json['fullName'] as String,
-      age: json['age'] as int,
-      grade: json['grade'] as String,
+      age: json['age'] as int?,
+      grade: json['grade'] as String? ?? '',
       status: ChildStatus.fromString(json['status'] as String? ?? 'ACTIVE'),
       parentId: json['parentId'] as int?,
       schoolId: json['schoolId'] as int?,
@@ -64,7 +64,7 @@ class Child {
     return {
       'id': id,
       'fullName': fullName,
-      'age': age,
+      if (age != null) 'age': age,
       'grade': grade,
       'status': status.value,
       if (parentId != null) 'parentId': parentId,

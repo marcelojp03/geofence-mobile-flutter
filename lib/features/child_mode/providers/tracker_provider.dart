@@ -9,9 +9,11 @@ import '../../tracking/data/tracking_repository.dart';
 import '../../devices/data/devices_repository.dart';
 import '../data/child_mode_storage.dart';
 import '../background/background_tracking_service.dart';
+import '../background/foreground_tracking_service.dart';
 
 /// Estado del tracker
 class TrackerState {
+  final bool isLoading;
   final bool isRunning;
   final bool isConfigured;
   final DateTime? lastSentAt;
@@ -23,6 +25,7 @@ class TrackerState {
   final String? childName;
 
   const TrackerState({
+    this.isLoading = true,
     this.isRunning = false,
     this.isConfigured = false,
     this.lastSentAt,
@@ -35,6 +38,7 @@ class TrackerState {
   });
 
   TrackerState copyWith({
+    bool? isLoading,
     bool? isRunning,
     bool? isConfigured,
     DateTime? lastSentAt,
@@ -46,6 +50,7 @@ class TrackerState {
     String? childName,
   }) {
     return TrackerState(
+      isLoading: isLoading ?? this.isLoading,
       isRunning: isRunning ?? this.isRunning,
       isConfigured: isConfigured ?? this.isConfigured,
       lastSentAt: lastSentAt ?? this.lastSentAt,
@@ -86,6 +91,7 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
 
   /// Carga la configuración guardada
   Future<void> _loadConfig() async {
+    developer.log('Loading config...', name: 'TrackerNotifier');
     final isConfigured = await _storage.isConfigured();
     final childName = await _storage.getChildName();
     final lastSent = await _storage.getLastSent();
@@ -93,21 +99,37 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
     if (isConfigured) {
       _childId = await _storage.getChildId();
       _deviceUid = await _storage.getDeviceUid();
+      developer.log(
+        'Config loaded: childId=$_childId, deviceUid=$_deviceUid',
+        name: 'TrackerNotifier',
+      );
+
+      // Auto-registrar background tracking si está configurado
+      await BackgroundTrackingService().startBackgroundTracking();
+      developer.log(
+        'Background tracking auto-registered',
+        name: 'TrackerNotifier',
+      );
     }
 
     state = state.copyWith(
+      isLoading: false,
       isConfigured: isConfigured,
       childName: childName,
       lastSentAt: lastSent,
     );
+    developer.log(
+      'State updated: isConfigured=$isConfigured, isLoading=false',
+      name: 'TrackerNotifier',
+    );
   }
 
   /// Configura el modo hijo con un childId (desde QR)
-  /// Flujo: 1) Registrar dispositivo, 2) Vincular al hijo, 3) Guardar config local
+  /// Usa el endpoint público POST /devices/pair
   Future<bool> configure({
     required int childId,
     required String childName,
-    int? schoolId,
+    required int schoolId,
   }) async {
     try {
       // 1. Obtener datos del dispositivo (incluye FCM token)
@@ -116,12 +138,14 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
       _childId = childId;
 
       developer.log(
-        'Configuring device: ${deviceData.deviceUid}',
+        'Pairing device: ${deviceData.deviceUid} with child: $childId',
         name: 'TrackerNotifier',
       );
 
-      // 2. Registrar dispositivo en el backend (POST /devices)
-      final registerResponse = await _devicesRepository.registerDevice(
+      // 2. Llamar al endpoint público POST /devices/pair
+      final pairResponse = await _devicesRepository.pairDevice(
+        schoolId: schoolId,
+        childId: childId,
         deviceUid: deviceData.deviceUid,
         name: deviceData.name,
         model: deviceData.model,
@@ -131,45 +155,34 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
         fcmToken: deviceData.fcmToken,
       );
 
-      if (!registerResponse.success) {
-        // Si el dispositivo ya existe (409), continuar con el link
+      if (!pairResponse.success) {
+        state = state.copyWith(lastError: pairResponse.message);
         developer.log(
-          'Device register response: ${registerResponse.message}',
-          name: 'TrackerNotifier',
-        );
-      }
-
-      // 3. Vincular dispositivo al hijo (POST /devices/link)
-      final linkResponse = await _devicesRepository.linkDeviceToChild(
-        deviceUid: deviceData.deviceUid,
-        childId: childId,
-      );
-
-      if (!linkResponse.success) {
-        state = state.copyWith(lastError: linkResponse.message);
-        developer.log(
-          'Error linking device: ${linkResponse.message}',
+          'Error pairing device: ${pairResponse.message}',
           name: 'TrackerNotifier',
         );
         return false;
       }
 
+      // 3. Usar el nombre del hijo del backend si está disponible
+      final actualChildName = pairResponse.data?.child.fullName ?? childName;
+
       // 4. Guardar configuración local
       await _storage.saveConfig(
         childId: childId,
         deviceUid: deviceData.deviceUid,
-        childName: childName,
+        childName: actualChildName,
         schoolId: schoolId,
       );
 
       state = state.copyWith(
         isConfigured: true,
-        childName: childName,
+        childName: actualChildName,
         lastError: null,
       );
 
       developer.log(
-        'Child mode configured: childId=$childId, deviceUid=$_deviceUid',
+        'Child mode configured: childId=$childId, deviceUid=$_deviceUid, childName=$actualChildName',
         name: 'TrackerNotifier',
       );
 
@@ -209,13 +222,16 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
       name: 'TrackerNotifier',
     );
 
-    // Iniciar background tracking con WorkManager
+    // Iniciar foreground service (más confiable que WorkManager)
+    await ForegroundTrackingService().startService();
+
+    // También registrar WorkManager como backup para cuando la app se cierre completamente
     await BackgroundTrackingService().startBackgroundTracking();
 
     // Enviar posición inicial
     await _sendPosition();
 
-    // Iniciar timer para foreground
+    // Timer local como fallback (cuando la app está en foreground)
     _timer?.cancel();
     _timer = Timer.periodic(interval, (_) => _sendPosition());
   }
@@ -224,6 +240,9 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
   Future<void> stopTracking() async {
     _timer?.cancel();
     _timer = null;
+
+    // Detener foreground service
+    await ForegroundTrackingService().stopService();
 
     // Detener background tracking
     await BackgroundTrackingService().stopBackgroundTracking();

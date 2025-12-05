@@ -71,6 +71,10 @@ class TrackingRepository {
         'Error sending position: ${e.message}',
         name: 'TrackingRepository',
       );
+      developer.log(
+        'Response data: ${e.response?.data}',
+        name: 'TrackingRepository',
+      );
       return _handleError<PositionResponse>(e);
     } catch (e) {
       developer.log('Error: $e', name: 'TrackingRepository');

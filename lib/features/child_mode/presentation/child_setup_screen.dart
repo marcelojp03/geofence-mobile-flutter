@@ -88,7 +88,7 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
       final childName = data['childName'] as String?;
       final schoolId = data['schoolId'] as int?;
 
-      if (childId == null || childName == null) {
+      if (childId == null || childName == null || schoolId == null) {
         setState(() {
           _errorMessage =
               'Código QR inválido. Genera uno nuevo desde la app de padres.';
@@ -112,7 +112,7 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
   Future<void> _configure({
     required int childId,
     required String childName,
-    int? schoolId,
+    required int schoolId,
   }) async {
     setState(() {
       _isLoading = true;

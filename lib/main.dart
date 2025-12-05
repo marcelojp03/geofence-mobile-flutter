@@ -8,6 +8,7 @@ import 'config/router/app_router.dart';
 import 'config/theme/app_theme.dart';
 import 'core/services/notification_service.dart';
 import 'features/child_mode/background/background_tracking_service.dart';
+import 'features/child_mode/background/foreground_tracking_service.dart';
 import 'shared/providers/theme_notifier.dart';
 
 void main() async {
@@ -30,8 +31,11 @@ void main() async {
   // Inicializar servicio de notificaciones
   await NotificationService().init();
 
-  // Inicializar WorkManager para background tracking
+  // Inicializar WorkManager para background tracking (backup)
   await BackgroundTrackingService().init();
+
+  // Inicializar Foreground Service para tracking confiable
+  await ForegroundTrackingService().init();
 
   runApp(const ProviderScope(child: MainApp()));
 }
@@ -66,7 +70,7 @@ class MainApp extends ConsumerWidget {
 
     return MaterialApp.router(
       routerConfig: appRouter,
-      title: 'GeoKids',
+      title: 'Geofence',
       debugShowCheckedModeBanner: false,
 
       // Configuración de tema

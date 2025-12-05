@@ -56,14 +56,26 @@ class ApiClient {
             '📥 ${response.statusCode} ${response.requestOptions.path}',
             name: 'ApiClient',
           );
+          // Log response body
+          if (response.data != null) {
+            developer.log('   Response: ${response.data}', name: 'ApiClient');
+          }
           return handler.next(response);
         },
         onError: (error, handler) {
+          // 404 es esperado en algunos casos (no hay datos), no es un error real
+          final statusCode = error.response?.statusCode;
+          final icon = statusCode == 404 ? '📭' : '❌';
           developer.log(
-            '❌ ${error.response?.statusCode ?? 'ERR'} ${error.requestOptions.path}',
+            '$icon $statusCode ${error.requestOptions.path}',
             name: 'ApiClient',
-            error: error.message,
           );
+          if (error.response?.data != null) {
+            developer.log(
+              '   Error: ${error.response?.data}',
+              name: 'ApiClient',
+            );
+          }
           return handler.next(error);
         },
       ),

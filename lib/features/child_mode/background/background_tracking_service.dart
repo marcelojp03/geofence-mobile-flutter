@@ -70,13 +70,14 @@ void childTrackingCallbackDispatcher() {
       final response = await dio.post(
         '/tracking/positions',
         data: {
-          'childId': childId,
+          'deviceUid': deviceUid, // Campo correcto para el backend
           'lat': position.latitude,
           'lng': position.longitude,
+          'accuracy': position.accuracy,
+          'speed': position.speed,
+          'heading': position.heading,
+          'altitude': position.altitude,
           'batteryLevel': batteryLevel,
-          'deviceIdentifier': deviceUid,
-          'source': 'background',
-          'timestamp': DateTime.now().toIso8601String(),
         },
       );
 

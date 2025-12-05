@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer' as developer;
 
 /// Almacenamiento de preferencias para el modo hijo
 class ChildModeStorage {
@@ -26,6 +27,10 @@ class ChildModeStorage {
       await prefs.setInt(_schoolIdKey, schoolId);
     }
     await prefs.setBool(_isConfiguredKey, true);
+    developer.log(
+      'Config saved: childId=$childId, deviceUid=$deviceUid, childName=$childName',
+      name: 'ChildModeStorage',
+    );
   }
 
   /// Obtiene el childId guardado
@@ -55,7 +60,9 @@ class ChildModeStorage {
   /// Verifica si el modo hijo está configurado
   Future<bool> isConfigured() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_isConfiguredKey) ?? false;
+    final result = prefs.getBool(_isConfiguredKey) ?? false;
+    developer.log('isConfigured check: $result', name: 'ChildModeStorage');
+    return result;
   }
 
   /// Guarda la última vez que se envió una posición

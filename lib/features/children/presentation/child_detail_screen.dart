@@ -99,7 +99,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                         TileLayer(
                           urlTemplate:
                               'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.geokids.app',
+                          userAgentPackageName: 'com.geofence.app',
                         ),
                         MarkerLayer(
                           markers: [

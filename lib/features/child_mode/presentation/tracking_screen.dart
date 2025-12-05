@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/tracker_provider.dart';
+import 'battery_optimization_dialog.dart';
 
 /// Pantalla de tracking activo para el modo hijo
 class TrackingScreen extends ConsumerStatefulWidget {
@@ -25,7 +26,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   void _checkConfig() {
     final state = ref.read(trackerNotifierProvider);
-    if (!state.isConfigured) {
+    // Solo redirigir si ya terminó de cargar y no está configurado
+    if (!state.isLoading && !state.isConfigured) {
       context.go('/child/setup');
     }
   }
@@ -35,8 +37,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     final trackerState = ref.watch(trackerNotifierProvider);
     final notifier = ref.read(trackerNotifierProvider.notifier);
 
+    // Mientras carga, mostrar loading
+    if (trackerState.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     // Si no está configurado, mostrar loading mientras redirige
     if (!trackerState.isConfigured) {
+      // Redirigir al setup
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.go('/child/setup');
+      });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -57,21 +68,34 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Card de estado principal
-              _buildStatusCard(trackerState),
+              // Contenido scrolleable
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Advertencia de optimización de batería
+                      const BatteryOptimizationStatus(),
 
-              const SizedBox(height: 24),
+                      // Card de estado principal
+                      _buildStatusCard(trackerState),
 
-              // Card de información
-              _buildInfoCard(trackerState),
+                      const SizedBox(height: 24),
+
+                      // Card de información
+                      _buildInfoCard(trackerState),
+
+                      const SizedBox(height: 16),
+
+                      // Error si existe
+                      if (trackerState.lastError != null)
+                        _buildErrorCard(trackerState.lastError!),
+                    ],
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 16),
-
-              // Error si existe
-              if (trackerState.lastError != null)
-                _buildErrorCard(trackerState.lastError!),
-
-              const Spacer(),
 
               // Botones de control
               Row(

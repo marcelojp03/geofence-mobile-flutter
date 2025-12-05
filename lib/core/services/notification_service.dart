@@ -22,14 +22,25 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
-  /// Canal de notificaciones para Android
+  /// Canal de notificaciones para Android - Alertas
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'geokids_alerts',
-    'Alertas GeoKids',
+    'geofence_alerts',
+    'Alertas Geofence',
     description: 'Notificaciones de alertas de geofence',
     importance: Importance.high,
     playSound: true,
   );
+
+  /// Canal de notificaciones para Android - Tracking
+  static const AndroidNotificationChannel _trackingChannel =
+      AndroidNotificationChannel(
+        'geofence_tracking',
+        'Geofence Tracking',
+        description: 'Notificación de servicio de tracking activo',
+        importance: Importance.low,
+        playSound: false,
+        showBadge: false,
+      );
 
   /// Inicializar el servicio de notificaciones
   Future<void> init() async {
@@ -89,12 +100,16 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    // Crear canal en Android
-    await _localNotifications
+    // Crear canal en Android - Alertas
+    final androidPlugin = _localNotifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_channel);
+        >();
+
+    await androidPlugin?.createNotificationChannel(_channel);
+
+    // Crear canal en Android - Tracking (para foreground service)
+    await androidPlugin?.createNotificationChannel(_trackingChannel);
   }
 
   /// Configurar handlers para mensajes FCM
@@ -129,7 +144,7 @@ class NotificationService {
     if (notification != null) {
       await _localNotifications.show(
         notification.hashCode,
-        notification.title ?? 'Alerta GeoKids',
+        notification.title ?? 'Alerta Geofence',
         notification.body ?? '',
         NotificationDetails(
           android: AndroidNotificationDetails(

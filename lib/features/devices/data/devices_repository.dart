@@ -87,6 +87,60 @@ class DevicesRepository {
     }
   }
 
+  /// Registra y vincula un dispositivo a un hijo en una sola llamada
+  /// POST /devices/pair (público - no requiere autenticación)
+  Future<ApiResponse<PairDeviceResponse>> pairDevice({
+    required int schoolId,
+    required int childId,
+    required String deviceUid,
+    required String name,
+    String? model,
+    String? manufacturer,
+    String? osVersion,
+    String? platform,
+    String? fcmToken,
+  }) async {
+    try {
+      final response = await _api.post(
+        '/devices/pair',
+        data: {
+          'schoolId': schoolId,
+          'childId': childId,
+          'deviceUid': deviceUid,
+          'name': name,
+          if (model != null) 'model': model,
+          if (manufacturer != null) 'manufacturer': manufacturer,
+          if (osVersion != null) 'osVersion': osVersion,
+          if (platform != null) 'platform': platform,
+          if (fcmToken != null) 'fcmToken': fcmToken,
+        },
+      );
+
+      final json = response.data as Map<String, dynamic>;
+
+      if (json['success'] == true) {
+        return ApiResponse<PairDeviceResponse>(
+          success: true,
+          message: json['message'] ?? 'Dispositivo vinculado',
+          data: PairDeviceResponse.fromJson(json),
+        );
+      }
+
+      return ApiResponse<PairDeviceResponse>(
+        success: false,
+        message: json['message'] ?? 'Error al vincular dispositivo',
+      );
+    } on DioException catch (e) {
+      return _handleError<PairDeviceResponse>(e);
+    } catch (e) {
+      developer.log('Error pairing device: $e', name: 'DevicesRepository');
+      return ApiResponse<PairDeviceResponse>(
+        success: false,
+        message: 'Error inesperado: ${e.toString()}',
+      );
+    }
+  }
+
   /// Obtiene la lista de dispositivos
   /// GET /devices
   Future<ApiResponse<List<Device>>> getDevices() async {
@@ -221,5 +275,61 @@ class DevicesRepository {
       );
     }
     return ApiResponse<T>(success: false, message: 'Error de conexión');
+  }
+}
+
+/// Respuesta del endpoint POST /devices/pair
+class PairDeviceResponse {
+  final Device device;
+  final PairedChild child;
+
+  PairDeviceResponse({required this.device, required this.child});
+
+  factory PairDeviceResponse.fromJson(Map<String, dynamic> json) {
+    return PairDeviceResponse(
+      device: Device.fromJson(json['device'] as Map<String, dynamic>),
+      child: PairedChild.fromJson(json['child'] as Map<String, dynamic>),
+    );
+  }
+}
+
+/// Información del hijo vinculado
+class PairedChild {
+  final int id;
+  final String fullName;
+  final String? grade;
+  final PairedParent? parent;
+
+  PairedChild({
+    required this.id,
+    required this.fullName,
+    this.grade,
+    this.parent,
+  });
+
+  factory PairedChild.fromJson(Map<String, dynamic> json) {
+    return PairedChild(
+      id: json['id'] as int,
+      fullName: json['fullName'] as String,
+      grade: json['grade'] as String?,
+      parent: json['parent'] != null
+          ? PairedParent.fromJson(json['parent'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+/// Información del padre del hijo vinculado
+class PairedParent {
+  final int id;
+  final String fullName;
+
+  PairedParent({required this.id, required this.fullName});
+
+  factory PairedParent.fromJson(Map<String, dynamic> json) {
+    return PairedParent(
+      id: json['id'] as int,
+      fullName: json['fullName'] as String,
+    );
   }
 }

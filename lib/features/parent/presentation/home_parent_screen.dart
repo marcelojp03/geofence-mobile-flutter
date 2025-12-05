@@ -26,7 +26,7 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('GeoKids'),
+        title: const Text('Geofence'),
         automaticallyImplyLeading: false,
         actions: [
           // Badge de notificaciones
@@ -641,7 +641,7 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
               Navigator.pop(context);
               await ref.read(authRepositoryProvider).logout();
               if (!mounted) return;
-              context.go('/login');
+              context.go('/mode');
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Cerrar Sesión'),
