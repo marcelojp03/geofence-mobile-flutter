@@ -243,12 +243,14 @@ Future<void> _sendLocationUpdate(ServiceInstance service) async {
     final response = await dio.post(
       '/tracking/positions',
       data: {
-        'deviceUid': deviceUid, // ← Campo correcto
+        'deviceUid': deviceUid,
         'lat': position.latitude,
         'lng': position.longitude,
         'accuracy': position.accuracy,
-        'speed': position.speed,
-        'heading': position.heading,
+        // speed y heading pueden ser 0.0 cuando el dispositivo está quieto
+        // Solo enviamos si hay un valor válido (> 0)
+        if (position.speed > 0) 'speed': position.speed,
+        if (position.heading > 0) 'heading': position.heading,
         'altitude': position.altitude,
         'batteryLevel': batteryLevel,
       },

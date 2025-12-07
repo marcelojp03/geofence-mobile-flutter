@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/env.dart';
 import 'config/router/app_router.dart';
 import 'config/theme/app_theme.dart';
+import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
 import 'features/child_mode/background/background_tracking_service.dart';
 import 'features/child_mode/background/foreground_tracking_service.dart';
@@ -27,6 +28,9 @@ void main() async {
       storageBucket: Env.firebaseStorageBucket,
     ),
   );
+
+  // Registrar evento de app iniciada en Analytics
+  AnalyticsService().logScreenView(screenName: 'app_launch');
 
   // Inicializar servicio de notificaciones
   await NotificationService().init();

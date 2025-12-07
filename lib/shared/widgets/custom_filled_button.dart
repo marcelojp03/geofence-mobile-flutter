@@ -67,7 +67,10 @@ class CustomFilledButton extends StatelessWidget {
             child: Container(
               padding:
                   padding ??
-                  EdgeInsets.symmetric(horizontal: r.wp(6), vertical: r.hp(2)),
+                  EdgeInsets.symmetric(
+                    horizontal: r.wp(5),
+                    vertical: r.hp(1.6),
+                  ), // Reduced from 6/2
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -75,20 +78,24 @@ class CustomFilledButton extends StatelessWidget {
                   // Loading indicator
                   if (isLoading) ...[
                     SizedBox(
-                      width: r.dp(2.2),
-                      height: r.dp(2.2),
+                      width: r.dp(2.0), // Reduced from 2.2
+                      height: r.dp(2.0),
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
                         color: fgColor,
                       ),
                     ),
-                    SizedBox(width: r.wp(3)),
+                    SizedBox(width: r.wp(2.5)), // Reduced from 3
                   ],
 
                   // Icono opcional
                   if (icon != null && !isLoading) ...[
-                    Icon(icon, color: fgColor, size: r.dp(2.2)),
-                    SizedBox(width: r.wp(2)),
+                    Icon(
+                      icon,
+                      color: fgColor,
+                      size: r.dp(2.0),
+                    ), // Reduced from 2.2
+                    SizedBox(width: r.wp(1.5)), // Reduced from 2
                   ],
 
                   // Texto
@@ -96,9 +103,9 @@ class CustomFilledButton extends StatelessWidget {
                     isLoading ? 'Cargando...' : text,
                     style: TextStyle(
                       color: fgColor,
-                      fontSize: r.dp(1.8),
+                      fontSize: r.dp(1.6), // Reduced from 1.8
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.3, // Reduced from 0.5
                     ),
                   ),
                 ],

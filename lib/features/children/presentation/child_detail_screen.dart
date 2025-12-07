@@ -10,7 +10,7 @@ import '../../tracking/providers/tracking_provider.dart';
 import '../../alerts/providers/alerts_provider.dart';
 import '../../alerts/domain/entities/alert.dart';
 import '../domain/entities/child.dart';
-import '../../../shared/utils/responsive.dart';
+import '../../../config/theme/app_theme.dart';
 
 /// Pantalla de detalle de un hijo con mapa y alertas
 class ChildDetailScreen extends ConsumerStatefulWidget {
@@ -30,36 +30,46 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     final childAsync = ref.watch(childDetailProvider(widget.childId));
     final positionAsync = ref.watch(childLastPositionProvider(widget.childId));
     final alertsAsync = ref.watch(childAlertsProvider(widget.childId));
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => context.pop(),
         ),
         title: childAsync.when(
-          data: (child) => Text(child.fullName),
+          data: (child) => Text(
+            child.fullName,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+          ),
           loading: () => const Text('Cargando...'),
           error: (_, __) => const Text('Error'),
         ),
+        elevation: 0,
+        scrolledUnderElevation: 2,
         actions: [
-          // Botón para vincular dispositivo (generar QR)
           childAsync.when(
             data: (child) => IconButton(
-              icon: const Icon(Icons.qr_code),
+              icon: Icon(Icons.qr_code_rounded, color: AppTheme.primaryColor),
               tooltip: 'Vincular dispositivo',
-              onPressed: () => _showQRDialog(context, child),
+              onPressed: () => _showQRDialog(context, child, isDark),
             ),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             onPressed: () {
               ref.invalidate(childLastPositionProvider(widget.childId));
               ref.invalidate(childAlertsProvider(widget.childId));
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -122,42 +132,59 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                       top: 16,
                       left: 16,
                       right: 16,
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.access_time,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF2a2a4a)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 18,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
                                 'Última actualización: ${position.timeAgo}',
-                                style: TextStyle(color: Colors.grey[600]),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                              const Spacer(),
-                              if (position.batteryLevel != null) ...[
-                                Icon(
-                                  _getBatteryIcon(position.batteryLevel!),
-                                  size: 16,
+                            ),
+                            if (position.batteryLevel != null) ...[
+                              Icon(
+                                _getBatteryIcon(position.batteryLevel!),
+                                size: 18,
+                                color: position.batteryLevel! > 20
+                                    ? AppTheme.insideColor
+                                    : AppTheme.errorColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${position.batteryLevel}%',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                   color: position.batteryLevel! > 20
-                                      ? Colors.green
-                                      : Colors.red,
+                                      ? AppTheme.insideColor
+                                      : AppTheme.errorColor,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${position.batteryLevel}%',
-                                  style: TextStyle(
-                                    color: position.batteryLevel! > 20
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ],
-                          ),
+                          ],
                         ),
                       ),
                     ),
@@ -200,11 +227,12 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'Alertas Recientes',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const Spacer(),
@@ -214,11 +242,11 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                           if (unread > 0) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
+                                horizontal: 10,
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.red,
+                                color: AppTheme.errorColor,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -226,6 +254,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             );
@@ -242,10 +271,13 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                   child: alertsAsync.when(
                     data: (alerts) {
                       if (alerts.isEmpty) {
-                        return const Center(
+                        return Center(
                           child: Text(
                             'No hay alertas',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 14,
+                            ),
                           ),
                         );
                       }
@@ -255,12 +287,15 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                         itemCount: alerts.length > 5 ? 5 : alerts.length,
                         itemBuilder: (context, index) {
                           final alert = alerts[index];
-                          return _buildAlertTile(alert);
+                          return _buildAlertTile(alert, theme, isDark);
                         },
                       );
                     },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
+                    loading: () => Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
                     error: (e, _) => Center(child: Text('Error: $e')),
                   ),
                 ),
@@ -272,42 +307,82 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     );
   }
 
-  Widget _buildAlertTile(Alert alert) {
+  Widget _buildAlertTile(Alert alert, ThemeData theme, bool isDark) {
     final isExit = alert.type == AlertType.exitArea;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isExit ? Colors.orange : Colors.green,
-          child: Icon(isExit ? Icons.logout : Icons.login, color: Colors.white),
-        ),
-        title: Text(
-          alert.type.displayName,
-          style: TextStyle(
-            fontWeight: alert.isRead ? FontWeight.normal : FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
-        subtitle: Text(
-          _formatDateTime(alert.createdAt),
-          style: TextStyle(color: Colors.grey[600]),
-        ),
-        trailing: !alert.isRead
-            ? Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isExit
+                  ? AppTheme.warningColor.withValues(alpha: 0.15)
+                  : AppTheme.insideColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isExit ? Icons.logout_rounded : Icons.login_rounded,
+              color: isExit ? AppTheme.warningColor : AppTheme.insideColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  alert.type.displayName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: alert.isRead
+                        ? FontWeight.w500
+                        : FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
-              )
-            : null,
+                const SizedBox(height: 2),
+                Text(
+                  _formatDateTime(alert.createdAt),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!alert.isRead)
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
       ),
     );
   }
 
   /// Muestra un dialog con el código QR para vincular dispositivo
-  void _showQRDialog(BuildContext context, Child child) {
+  void _showQRDialog(BuildContext context, Child child, bool isDark) {
     // Datos que irán en el QR
     final qrData = jsonEncode({
       'childId': child.id,
@@ -318,67 +393,77 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) {
-        final dr = dialogContext.responsive;
-        final primaryColor = Theme.of(dialogContext).colorScheme.primary;
-
         return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2a2a4a) : Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(dr.dp(2)),
+            borderRadius: BorderRadius.circular(24),
           ),
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.qr_code, color: primaryColor, size: dr.dp(3)),
-              SizedBox(width: dr.wp(2)),
-              Flexible(
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.qr_code_rounded,
+                  color: AppTheme.primaryColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Flexible(
                 child: Text(
                   'Vincular Dispositivo',
-                  style: TextStyle(fontSize: dr.dp(2.2)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           content: SizedBox(
-            width: dr.wp(75),
+            width: 280,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Instrucciones
                 Container(
-                  padding: EdgeInsets.all(dr.dp(1.2)),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(dr.dp(1)),
+                    color: AppTheme.infoColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        Icons.info_outline,
-                        color: Colors.blue[700],
-                        size: dr.dp(2.2),
+                        Icons.info_outline_rounded,
+                        color: AppTheme.infoColor,
+                        size: 20,
                       ),
-                      SizedBox(width: dr.wp(2)),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Escanea este código desde el celular de ${child.fullName}',
                           style: TextStyle(
-                            fontSize: dr.dp(1.5),
-                            color: Colors.blue[800],
+                            fontSize: 13,
+                            color: isDark ? Colors.white70 : AppTheme.infoColor,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                SizedBox(height: dr.hp(2.5)),
+                const SizedBox(height: 24),
                 // QR Code
                 Container(
-                  padding: EdgeInsets.all(dr.dp(1.5)),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(dr.dp(1.5)),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.1),
@@ -390,25 +475,25 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                   child: QrImageView(
                     data: qrData,
                     version: QrVersions.auto,
-                    size: dr.wp(45),
+                    size: 180,
                     backgroundColor: Colors.white,
                     eyeStyle: QrEyeStyle(
                       eyeShape: QrEyeShape.square,
-                      color: primaryColor,
+                      color: AppTheme.primaryColor,
                     ),
                     dataModuleStyle: QrDataModuleStyle(
                       dataModuleShape: QrDataModuleShape.square,
-                      color: primaryColor,
+                      color: AppTheme.primaryColor,
                     ),
                   ),
                 ),
-                SizedBox(height: dr.hp(2)),
+                const SizedBox(height: 16),
                 // Nombre del hijo
                 Text(
                   child.fullName,
-                  style: TextStyle(
-                    fontSize: dr.dp(1.8),
-                    fontWeight: FontWeight.bold,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -418,7 +503,14 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text('Cerrar', style: TextStyle(fontSize: dr.dp(1.6))),
+              child: Text(
+                'Cerrar',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         );

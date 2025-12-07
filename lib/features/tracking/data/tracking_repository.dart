@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/entities/api_response.dart';
 import '../../../config/env.dart';
 import '../domain/entities/position.dart';
+import '../domain/entities/child_current_location.dart';
 
 /// Repositorio para tracking de posiciones GPS
 /// Endpoints: /tracking/*
@@ -188,6 +189,45 @@ class TrackingRepository {
       return _handleError<List<Position>>(e);
     } catch (e) {
       return ApiResponse<List<Position>>(
+        success: false,
+        message: 'Error inesperado: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Obtiene ubicaciones actuales de los hijos del padre logueado
+  /// GET /tracking/my-children
+  /// Incluye: hasSignal, status, minutesSinceUpdate
+  Future<ApiResponse<List<ChildCurrentLocation>>>
+  getMyChildrenCurrentLocations() async {
+    try {
+      final response = await _api.get('/tracking/my-children');
+      final json = response.data as Map<String, dynamic>;
+
+      if (json['success'] == true) {
+        final List<dynamic> data = json['data'] as List;
+        final locations = data
+            .map(
+              (item) =>
+                  ChildCurrentLocation.fromJson(item as Map<String, dynamic>),
+            )
+            .toList();
+
+        return ApiResponse<List<ChildCurrentLocation>>(
+          success: true,
+          message: json['message'] ?? 'OK',
+          data: locations,
+        );
+      }
+
+      return ApiResponse<List<ChildCurrentLocation>>(
+        success: false,
+        message: json['message'] ?? 'Error al obtener ubicaciones',
+      );
+    } on DioException catch (e) {
+      return _handleError<List<ChildCurrentLocation>>(e);
+    } catch (e) {
+      return ApiResponse<List<ChildCurrentLocation>>(
         success: false,
         message: 'Error inesperado: ${e.toString()}',
       );

@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../config/theme/app_theme.dart';
-import '../../../shared/utils/responsive.dart';
-import '../../../shared/widgets/widgets.dart';
 // TODO: Descomentar cuando Firebase esté configurado
 // import '../../notifications/providers/fcm_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/login_form_provider.dart';
 
 /// Pantalla de login para padres
-/// Con animaciones, glassmorphism y manejo de estados completo
 class LoginScreen extends ConsumerWidget {
   static const String name = 'login';
 
@@ -18,25 +15,25 @@ class LoginScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final r = context.responsive;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Colores adaptativos
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subtitleColor = isDark
-        ? Colors.white.withValues(alpha: 0.8)
-        : Colors.black54;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return GestureDetector(
-      // Cerrar teclado al tocar fuera
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-      child: AnimatedBackground(
-        style: BackgroundStyle.surface,
-        animated: true,
-        intensity: 0.6,
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
+      child: Scaffold(
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? [const Color(0xFF1a1a2e), const Color(0xFF16213e)]
+                  : [Colors.grey.shade50, Colors.white],
+            ),
+          ),
+          child: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
@@ -47,77 +44,107 @@ class LoginScreen extends ConsumerWidget {
                     ),
                     child: IntrinsicHeight(
                       child: Padding(
-                        padding: EdgeInsets.all(AppTheme.spacingMedium),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            const SizedBox(height: 8),
+
                             // Botón de regreso
                             Align(
                               alignment: Alignment.centerLeft,
                               child: IconButton(
                                 onPressed: () => context.go('/mode'),
                                 icon: Icon(
-                                  Icons.arrow_back_ios_new,
-                                  color: textColor,
+                                  Icons.arrow_back_ios_new_rounded,
+                                  color: theme.colorScheme.onSurface,
+                                  size: 20,
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: isDark
+                                      ? Colors.white.withOpacity(0.1)
+                                      : Colors.grey.shade100,
                                 ),
                               ),
                             ),
 
-                            SizedBox(height: r.hp(2)),
+                            const SizedBox(height: 24),
 
-                            // Logo / Icono
+                            // Logo
                             Center(
                               child: Hero(
                                 tag: 'app_logo',
                                 child: Container(
-                                  padding: EdgeInsets.all(r.wp(6)),
+                                  width: 90,
+                                  height: 90,
                                   decoration: BoxDecoration(
+                                    color: Colors.white,
                                     shape: BoxShape.circle,
-                                    color: Theme.of(context).colorScheme.primary
-                                        .withValues(alpha: 0.1),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primaryColor
+                                            .withOpacity(0.2),
+                                        blurRadius: 25,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
                                   ),
-                                  child: Icon(
-                                    Icons.location_on,
-                                    size: r.dp(10),
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(18),
+                                    child: Image.asset(
+                                      'assets/geofencing_logo.png',
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => Icon(
+                                        Icons.location_on_rounded,
+                                        size: 42,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
 
-                            SizedBox(height: r.hp(3)),
+                            const SizedBox(height: 28),
 
                             // Título
                             Text(
-                              'Iniciar Sesión',
-                              style: TextStyle(
-                                fontSize: r.dp(3),
+                              'Bienvenido de nuevo',
+                              style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: textColor,
                               ),
                               textAlign: TextAlign.center,
                             ),
 
-                            SizedBox(height: r.hp(1)),
+                            const SizedBox(height: 6),
 
-                            // Subtítulo
                             Text(
-                              'Ingresa tus datos para continuar',
-                              style: TextStyle(
-                                fontSize: r.dp(1.8),
-                                color: subtitleColor,
+                              'Ingresa tus credenciales para continuar',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                               textAlign: TextAlign.center,
                             ),
 
-                            SizedBox(height: r.hp(3)),
+                            const SizedBox(height: 36),
 
-                            // Formulario en GlassCard
+                            // Formulario
                             const _LoginForm(),
 
-                            SizedBox(height: r.hp(2)),
+                            const Spacer(),
+
+                            // Footer
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              child: Text(
+                                '¿Problemas para acceder? Contacta soporte',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withOpacity(0.6),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -133,7 +160,7 @@ class LoginScreen extends ConsumerWidget {
   }
 }
 
-/// Formulario de login con estado
+/// Formulario de login
 class _LoginForm extends ConsumerStatefulWidget {
   const _LoginForm();
 
@@ -143,132 +170,262 @@ class _LoginForm extends ConsumerStatefulWidget {
 
 class _LoginFormState extends ConsumerState<_LoginForm> {
   bool _obscurePassword = true;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final loginForm = ref.watch(loginFormProvider);
     final authState = ref.watch(authProvider);
-    final r = context.responsive;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final linkColor = isDark ? Colors.white : AppTheme.primaryColor;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     // Listener para navegar cuando el login es exitoso
     ref.listen(authProvider, (previous, next) {
-      // Limpiar errores al entrar
       if (previous == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ref.read(authProvider.notifier).clearError();
         });
       }
 
-      // Login exitoso
       if (next.status == AuthStatus.authenticated &&
           previous?.status != next.status) {
         if (context.mounted) {
-          _showSuccessDialog(context, r, isDark);
+          _showSuccessAndNavigate(context, isDark);
         }
       }
     });
 
-    return GlassCard(
-      padding: EdgeInsets.all(AppTheme.spacingLarge),
-      borderRadius: AppTheme.borderRadiusLarge,
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          // Mensajes de error
-          _buildErrorMessage(authState, loginForm, r),
+          // Mensaje de error
+          _buildErrorMessage(authState, loginForm),
 
           // Email
-          CustomInputField(
+          _buildTextField(
+            controller: _emailController,
+            focusNode: _emailFocus,
             label: 'Correo electrónico',
-            prefixIcon: Icons.email_outlined,
+            hint: 'ejemplo@correo.com',
+            icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             onChanged: ref.read(loginFormProvider.notifier).onEmailChange,
-            errorMessage: loginForm.emailError,
-            isFormPosted: loginForm.isFormPosted,
+            errorText: loginForm.isFormPosted ? loginForm.emailError : null,
+            onSubmitted: (_) => _passwordFocus.requestFocus(),
           ),
 
-          SizedBox(height: r.hp(2.5)),
+          const SizedBox(height: 20),
 
           // Contraseña
-          CustomInputField(
+          _buildTextField(
+            controller: _passwordController,
+            focusNode: _passwordFocus,
             label: 'Contraseña',
-            prefixIcon: Icons.lock_outline,
+            hint: '••••••••',
+            icon: Icons.lock_outlined,
             obscureText: _obscurePassword,
             textInputAction: TextInputAction.done,
             onChanged: ref.read(loginFormProvider.notifier).onPasswordChange,
-            errorMessage: loginForm.passwordError,
-            isFormPosted: loginForm.isFormPosted,
-            onFieldSubmitted: (_) => _handleSubmit(),
+            errorText: loginForm.isFormPosted ? loginForm.passwordError : null,
+            onSubmitted: (_) => _handleSubmit(),
             suffixIcon: IconButton(
-              onPressed: () {
-                setState(() => _obscurePassword = !_obscurePassword);
-              },
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
               icon: Icon(
                 _obscurePassword
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
-                color: isDark ? Colors.white54 : Colors.black45,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 20,
               ),
-              splashRadius: 20,
-              tooltip: _obscurePassword
-                  ? 'Mostrar contraseña'
-                  : 'Ocultar contraseña',
             ),
           ),
 
-          SizedBox(height: r.hp(4)),
+          const SizedBox(height: 32),
 
           // Botón de login
-          CustomFilledButton(
-            text: 'Iniciar sesión',
-            isLoading: loginForm.isPosting,
-            onPressed: loginForm.isPosting ? null : _handleSubmit,
-            buttonColor: AppTheme.primaryColor,
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: loginForm.isPosting ? null : _handleSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppTheme.primaryColor.withOpacity(0.6),
+                elevation: loginForm.isPosting ? 0 : 4,
+                shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: loginForm.isPosting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Iniciar sesión',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// Construye el mensaje de error si existe
-  Widget _buildErrorMessage(
-    AuthState authState,
-    LoginFormState loginForm,
-    Responsive r,
-  ) {
-    final errorMessage = authState.errorMessage ?? loginForm.errorMessage;
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required ValueChanged<String> onChanged,
+    TextInputType keyboardType = TextInputType.text,
+    TextInputAction textInputAction = TextInputAction.next,
+    bool obscureText = false,
+    String? errorText,
+    Widget? suffixIcon,
+    ValueChanged<String>? onSubmitted,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    if (errorMessage == null) {
-      return const SizedBox.shrink();
-    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          obscureText: obscureText,
+          onChanged: onChanged,
+          onSubmitted: onSubmitted,
+          style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+            ),
+            prefixIcon: Icon(
+              icon,
+              size: 20,
+              color: errorText != null
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            suffixIcon: suffixIcon,
+            filled: true,
+            fillColor: isDark
+                ? Colors.white.withOpacity(0.05)
+                : Colors.grey.shade50,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.white12 : Colors.grey.shade200,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.white12 : Colors.grey.shade200,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.colorScheme.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: theme.colorScheme.error,
+                width: 1.5,
+              ),
+            ),
+            errorText: errorText,
+            errorStyle: const TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorMessage(AuthState authState, LoginFormState loginForm) {
+    final errorMessage = authState.errorMessage ?? loginForm.errorMessage;
+    if (errorMessage == null) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(AppTheme.spacingNormal),
-      margin: EdgeInsets.only(bottom: AppTheme.spacingMedium),
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: AppTheme.errorColorLight.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppTheme.borderRadiusNormal),
-        border: Border.all(
-          color: AppTheme.errorColorLight.withValues(alpha: 0.3),
-        ),
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.error_outline,
-            color: AppTheme.errorColorLight,
-            size: r.dp(2.2),
-          ),
-          SizedBox(width: r.wp(2)),
+          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               errorMessage,
               style: TextStyle(
-                color: AppTheme.errorColorLight,
-                fontSize: r.dp(1.5),
+                color: Colors.red.shade700,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -278,77 +435,73 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
     );
   }
 
-  /// Maneja el envío del formulario
   Future<void> _handleSubmit() async {
-    // Cerrar teclado
     FocusManager.instance.primaryFocus?.unfocus();
-
-    // Enviar formulario
     await ref.read(loginFormProvider.notifier).onFormSubmit();
   }
 
-  /// Muestra diálogo de éxito y navega al home
-  void _showSuccessDialog(BuildContext context, Responsive r, bool isDark) {
+  void _showSuccessAndNavigate(BuildContext context, bool isDark) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.3),
+      barrierColor: Colors.black.withOpacity(0.4),
       builder: (context) => Center(
-        child: Padding(
-          padding: EdgeInsets.all(AppTheme.spacingLarge),
-          child: GlassCard(
-            padding: EdgeInsets.all(AppTheme.spacingLarge),
-            borderRadius: AppTheme.borderRadiusLarge,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(r.wp(4)),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.insideColor.withValues(alpha: 0.1),
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: AppTheme.insideColor,
-                    size: r.dp(6),
-                  ),
+        child: Container(
+          margin: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.insideColor.withOpacity(0.1),
                 ),
-                SizedBox(height: AppTheme.spacingMedium),
-                Text(
-                  'Acceso Autorizado',
-                  style: TextStyle(
-                    fontSize: r.dp(2.2),
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: AppTheme.insideColor,
+                  size: 40,
                 ),
-                SizedBox(height: AppTheme.spacingSmall),
-                Text(
-                  'Sesión iniciada correctamente.\nRedirigiendo...',
-                  style: TextStyle(
-                    fontSize: r.dp(1.6),
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                  textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Acceso autorizado',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Redirigiendo...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
 
-    // Navegar después del delay
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 1200), () {
       if (!context.mounted) return;
-      Navigator.of(context).pop(); // Cerrar dialog
-
-      // TODO: Descomentar cuando Firebase esté configurado
-      // Registrar FCM token en el backend (no bloqueante)
-      // ref.read(fcmTokenNotifierProvider.notifier).registerToken();
-
+      Navigator.of(context).pop();
       context.go('/parent');
     });
   }

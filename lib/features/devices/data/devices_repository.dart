@@ -265,6 +265,86 @@ class DevicesRepository {
     }
   }
 
+  /// Registra el dispositivo del padre para recibir notificaciones de un hijo
+  /// POST /devices/register-parent (requiere JWT)
+  Future<ApiResponse<Device>> registerParentDevice({
+    required int childId,
+    required String deviceUid,
+    required String fcmToken,
+    String? name,
+    String? model,
+    String? platform,
+  }) async {
+    try {
+      final response = await _api.post(
+        '/devices/register-parent',
+        data: {
+          'childId': childId,
+          'deviceUid': deviceUid,
+          'fcmToken': fcmToken,
+          if (name != null) 'name': name,
+          if (model != null) 'model': model,
+          if (platform != null) 'platform': platform,
+        },
+      );
+
+      final json = response.data as Map<String, dynamic>;
+
+      if (json['success'] == true) {
+        return ApiResponse<Device>(
+          success: true,
+          message: json['message'] ?? 'Dispositivo del padre registrado',
+          data: Device.fromJson(json['device'] as Map<String, dynamic>),
+        );
+      }
+
+      return ApiResponse<Device>(
+        success: false,
+        message: json['message'] ?? 'Error al registrar dispositivo',
+      );
+    } on DioException catch (e) {
+      return _handleError<Device>(e);
+    } catch (e) {
+      developer.log(
+        'Error registering parent device: $e',
+        name: 'DevicesRepository',
+      );
+      return ApiResponse<Device>(
+        success: false,
+        message: 'Error inesperado: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Actualiza el token FCM de un dispositivo
+  /// PATCH /devices/fcm-token (público)
+  Future<ApiResponse<void>> updateFcmToken({
+    required String deviceUid,
+    required String fcmToken,
+  }) async {
+    try {
+      final response = await _api.patch(
+        '/devices/fcm-token',
+        data: {'deviceUid': deviceUid, 'fcmToken': fcmToken},
+      );
+
+      final json = response.data as Map<String, dynamic>;
+
+      return ApiResponse<void>(
+        success: json['success'] ?? false,
+        message: json['message'] ?? 'Token actualizado',
+      );
+    } on DioException catch (e) {
+      return _handleError<void>(e);
+    } catch (e) {
+      developer.log('Error updating FCM token: $e', name: 'DevicesRepository');
+      return ApiResponse<void>(
+        success: false,
+        message: 'Error inesperado: ${e.toString()}',
+      );
+    }
+  }
+
   ApiResponse<T> _handleError<T>(DioException e) {
     if (e.response?.data != null && e.response!.data is Map) {
       final json = e.response!.data as Map<String, dynamic>;

@@ -33,7 +33,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <application
-        android:label="geofence_mobile_flutter"
+        android:label="Geofence"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

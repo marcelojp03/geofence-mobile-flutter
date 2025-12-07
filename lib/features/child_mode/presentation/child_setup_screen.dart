@@ -4,13 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/tracker_provider.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/device_service.dart';
 import '../../../config/theme/app_theme.dart';
-import '../../../shared/utils/responsive.dart';
-import '../../../shared/widgets/widgets.dart';
 
 /// Pantalla para configurar el dispositivo como rastreador de un hijo
-/// Usa escaneo de código QR para configuración rápida
 class ChildSetupScreen extends ConsumerStatefulWidget {
   static const String name = 'child-setup';
 
@@ -20,17 +18,33 @@ class ChildSetupScreen extends ConsumerStatefulWidget {
   ConsumerState<ChildSetupScreen> createState() => _ChildSetupScreenState();
 }
 
-class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
+class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   bool _isScanning = false;
   String? _deviceInfo;
   String? _errorMessage;
   MobileScannerController? _scannerController;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _loadDeviceInfo();
+    _setupAnimations();
+    _fadeController.forward();
+  }
+
+  void _setupAnimations() {
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
   }
 
   Future<void> _loadDeviceInfo() async {
@@ -47,6 +61,7 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
   @override
   void dispose() {
     _scannerController?.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -78,10 +93,8 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
     final String? code = barcodes.first.rawValue;
     if (code == null) return;
 
-    // Detener escáner inmediatamente
     _stopScanning();
 
-    // Parsear QR
     try {
       final data = jsonDecode(code) as Map<String, dynamic>;
       final childId = data['childId'] as int?;
@@ -96,7 +109,6 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
         return;
       }
 
-      // Configurar dispositivo con datos del QR
       await _configure(
         childId: childId,
         childName: childName,
@@ -126,8 +138,15 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
     setState(() => _isLoading = false);
 
     if (success && mounted) {
+      final analytics = AnalyticsService();
+      await analytics.logQrScanned(success: true);
+      await analytics.logChildLinked(childId: childId, schoolId: schoolId);
       context.go('/child/tracking');
     } else {
+      await AnalyticsService().logQrScanned(
+        success: false,
+        error: 'configuration_failed',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = 'Error al configurar dispositivo. Intenta de nuevo.';
@@ -138,258 +157,341 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final r = context.responsive;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subtitleColor = isDark ? Colors.white70 : Colors.black54;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return AnimatedBackground(
-      style: BackgroundStyle.surface,
-      animated: true,
-      intensity: 0.6,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [const Color(0xFF1a1a2e), const Color(0xFF16213e)]
+                : [Colors.grey.shade50, Colors.white],
+          ),
+        ),
+        child: SafeArea(
           child: _isScanning
-              ? _buildScannerView(r, isDark)
-              : _buildSetupView(r, isDark, textColor, subtitleColor),
+              ? _buildScannerView(isDark)
+              : _buildSetupView(theme, isDark),
         ),
       ),
     );
   }
 
-  Widget _buildSetupView(
-    Responsive r,
-    bool isDark,
-    Color textColor,
-    Color subtitleColor,
-  ) {
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      padding: EdgeInsets.all(AppTheme.spacingMedium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Botón de regreso
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => context.go('/mode'),
-              icon: Icon(Icons.arrow_back_ios_new, color: textColor),
-            ),
-          ),
+  Widget _buildSetupView(ThemeData theme, bool isDark) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 8),
 
-          SizedBox(height: r.hp(2)),
-
-          // Icono
-          Center(
-            child: Container(
-              padding: EdgeInsets.all(r.wp(6)),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.1),
-              ),
-              child: Icon(
-                Icons.phone_android,
-                size: r.dp(8),
-                color: Theme.of(context).colorScheme.primary,
+            // Botón de regreso
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: () => context.go('/mode'),
+                icon: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: theme.colorScheme.onSurface,
+                  size: 20,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.grey.shade100,
+                ),
               ),
             ),
-          ),
 
-          SizedBox(height: r.hp(3)),
+            const SizedBox(height: 24),
 
-          // Título
-          Text(
-            'Configurar Rastreador',
-            style: TextStyle(
-              fontSize: r.dp(2.8),
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          SizedBox(height: r.hp(1)),
-
-          Text(
-            'Este dispositivo enviará la ubicación del niño',
-            style: TextStyle(fontSize: r.dp(1.7), color: subtitleColor),
-            textAlign: TextAlign.center,
-          ),
-
-          SizedBox(height: r.hp(4)),
-
-          // Card principal
-          GlassCard(
-            padding: EdgeInsets.all(AppTheme.spacingLarge),
-            borderRadius: AppTheme.borderRadiusLarge,
-            child: Column(
-              children: [
-                // Error message
-                if (_errorMessage != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(AppTheme.spacingNormal),
-                    decoration: BoxDecoration(
-                      color: AppTheme.errorColorLight.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        AppTheme.borderRadiusNormal,
-                      ),
-                      border: Border.all(
-                        color: AppTheme.errorColorLight.withValues(alpha: 0.3),
-                      ),
+            // Logo
+            Center(
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.secondaryColor.withOpacity(0.2),
+                      blurRadius: 25,
+                      offset: const Offset(0, 8),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: AppTheme.errorColorLight,
-                          size: r.dp(2.2),
-                        ),
-                        SizedBox(width: r.wp(2)),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: AppTheme.errorColorLight,
-                              fontSize: r.dp(1.5),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Image.asset(
+                    'assets/geofencing_logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.phone_android_rounded,
+                      size: 42,
+                      color: AppTheme.secondaryColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 28),
+
+            // Título
+            Text(
+              'Configurar dispositivo',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: 6),
+
+            Text(
+              'Este teléfono enviará la ubicación del niño',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: 32),
+
+            // Card principal
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Error message
+                  if (_errorMessage != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade600,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: r.hp(2)),
-                ],
-
-                // Info del dispositivo
-                if (_deviceInfo != null)
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(AppTheme.spacingNormal),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(
-                        AppTheme.borderRadiusNormal,
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.smartphone,
-                          color: subtitleColor,
-                          size: r.dp(2.5),
-                        ),
-                        SizedBox(width: r.wp(3)),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Dispositivo',
-                                style: TextStyle(
-                                  fontSize: r.dp(1.4),
-                                  color: subtitleColor,
-                                ),
-                              ),
-                              Text(
-                                _deviceInfo!,
-                                style: TextStyle(
-                                  fontSize: r.dp(1.7),
-                                  fontWeight: FontWeight.w500,
-                                  color: textColor,
-                                ),
-                              ),
-                            ],
+                    const SizedBox(height: 20),
+                  ],
+
+                  // Info del dispositivo
+                  if (_deviceInfo != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.05)
+                            : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTheme.secondaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.smartphone_rounded,
+                              color: AppTheme.secondaryColor,
+                              size: 20,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Dispositivo',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _deviceInfo!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 28),
+
+                  // Icono QR
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.qr_code_scanner_rounded,
+                      size: 36,
+                      color: AppTheme.primaryColor,
                     ),
                   ),
 
-                SizedBox(height: r.hp(3)),
+                  const SizedBox(height: 20),
 
-                // Instrucciones
-                Icon(
-                  Icons.qr_code_scanner,
-                  size: r.dp(6),
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-
-                SizedBox(height: r.hp(2)),
-
-                Text(
-                  'Escanea el código QR',
-                  style: TextStyle(
-                    fontSize: r.dp(2),
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                SizedBox(height: r.hp(1)),
-
-                Text(
-                  'Pide al padre/madre que genere un código QR desde su app o panel web',
-                  style: TextStyle(fontSize: r.dp(1.5), color: subtitleColor),
-                  textAlign: TextAlign.center,
-                ),
-
-                SizedBox(height: r.hp(3)),
-
-                // Botón escanear
-                CustomFilledButton(
-                  text: _isLoading ? 'Configurando...' : 'Escanear código QR',
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _startScanning,
-                  buttonColor: AppTheme.primaryColor,
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: r.hp(2)),
-
-          // Nota informativa
-          GlassCard(
-            padding: EdgeInsets.all(AppTheme.spacingNormal),
-            borderRadius: AppTheme.borderRadiusNormal,
-            backgroundColor: AppTheme.infoColor.withValues(
-              alpha: isDark ? 0.15 : 0.1,
-            ),
-            borderColor: AppTheme.infoColor.withValues(alpha: 0.2),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: AppTheme.infoColor,
-                  size: r.dp(2.5),
-                ),
-                SizedBox(width: r.wp(3)),
-                Expanded(
-                  child: Text(
-                    'El código QR contiene la información necesaria para vincular este dispositivo con el perfil del niño.',
+                  Text(
+                    'Escanea el código QR',
                     style: TextStyle(
-                      fontSize: r.dp(1.4),
-                      color: isDark ? Colors.white70 : AppTheme.infoColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  Text(
+                    'Pide al padre/madre que genere un código QR desde su app',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Botón escanear
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _startScanning,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                      label: Text(
+                        _isLoading ? 'Configurando...' : 'Escanear código QR',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 16),
+
+            // Nota informativa
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.infoColor.withOpacity(isDark ? 0.15 : 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.infoColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: AppTheme.infoColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'El código QR contiene la información necesaria para vincular este dispositivo.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white70 : AppTheme.infoColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildScannerView(Responsive r, bool isDark) {
+  Widget _buildScannerView(bool isDark) {
     return Stack(
       children: [
         // Scanner
@@ -397,43 +499,50 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
 
         // Overlay
         Container(
-          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5)),
+          decoration: BoxDecoration(color: Colors.black.withOpacity(0.6)),
           child: Stack(
             children: [
               // Área de escaneo transparente
               Center(
                 child: Container(
-                  width: r.wp(70),
-                  height: r.wp(70),
+                  width: 260,
+                  height: 260,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.white, width: 2),
-                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white, width: 3),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                    ],
                   ),
                 ),
               ),
 
               // Texto superior
               Positioned(
-                top: r.hp(8),
+                top: 60,
                 left: 0,
                 right: 0,
                 child: Column(
                   children: [
-                    Text(
+                    const Text(
                       'Apunta al código QR',
                       style: TextStyle(
-                        fontSize: r.dp(2.2),
+                        fontSize: 22,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: r.hp(1)),
+                    const SizedBox(height: 8),
                     Text(
                       'Coloca el código dentro del recuadro',
                       style: TextStyle(
-                        fontSize: r.dp(1.6),
-                        color: Colors.white70,
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -443,30 +552,29 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen> {
 
               // Botón cancelar
               Positioned(
-                bottom: r.hp(6),
-                left: AppTheme.spacingLarge,
-                right: AppTheme.spacingLarge,
-                child: GlassCard(
-                  onTap: _stopScanning,
-                  padding: EdgeInsets.symmetric(
-                    vertical: AppTheme.spacingNormal,
-                    horizontal: AppTheme.spacingLarge,
-                  ),
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.close, color: Colors.white, size: r.dp(2.5)),
-                      SizedBox(width: r.wp(2)),
-                      Text(
-                        'Cancelar',
-                        style: TextStyle(
-                          fontSize: r.dp(1.8),
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
+                bottom: 50,
+                left: 24,
+                right: 24,
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _stopScanning,
+                    icon: const Icon(Icons.close_rounded, size: 22),
+                    label: const Text(
+                      'Cancelar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
                 ),
               ),

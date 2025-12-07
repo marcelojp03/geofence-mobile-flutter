@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/tracker_provider.dart';
+import '../../../config/theme/app_theme.dart';
 import 'battery_optimization_dialog.dart';
 
 /// Pantalla de tracking activo para el modo hijo
@@ -14,143 +15,132 @@ class TrackingScreen extends ConsumerStatefulWidget {
   ConsumerState<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _TrackingScreenState extends ConsumerState<TrackingScreen> {
+class _TrackingScreenState extends ConsumerState<TrackingScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
   @override
   void initState() {
     super.initState();
-    // Verificar configuración después del build
+    _setupAnimations();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkConfig();
     });
   }
 
+  void _setupAnimations() {
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
   void _checkConfig() {
     final state = ref.read(trackerNotifierProvider);
-    // Solo redirigir si ya terminó de cargar y no está configurado
     if (!state.isLoading && !state.isConfigured) {
       context.go('/child/setup');
     }
   }
 
   @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final trackerState = ref.watch(trackerNotifierProvider);
     final notifier = ref.read(trackerNotifierProvider.notifier);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    // Mientras carga, mostrar loading
-    if (trackerState.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    // Control de animación según estado
+    if (trackerState.isRunning) {
+      _pulseController.repeat(reverse: true);
+    } else {
+      _pulseController.stop();
+      _pulseController.reset();
     }
 
-    // Si no está configurado, mostrar loading mientras redirige
+    if (trackerState.isLoading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+      );
+    }
+
     if (!trackerState.isConfigured) {
-      // Redirigir al setup
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.go('/child/setup');
       });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+      );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Modo Rastreador'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _showSettingsMenu(context, notifier),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [const Color(0xFF1a1a2e), const Color(0xFF16213e)]
+                : [Colors.grey.shade50, Colors.white],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        ),
+        child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // App bar custom
+              _buildAppBar(context, theme, notifier),
+
               // Contenido scrolleable
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const SizedBox(height: 16),
+
                       // Advertencia de optimización de batería
                       const BatteryOptimizationStatus(),
 
-                      // Card de estado principal
-                      _buildStatusCard(trackerState),
-
                       const SizedBox(height: 24),
 
+                      // Card de estado principal
+                      _buildStatusCard(trackerState, isDark),
+
+                      const SizedBox(height: 20),
+
                       // Card de información
-                      _buildInfoCard(trackerState),
+                      _buildInfoCard(trackerState, theme, isDark),
 
                       const SizedBox(height: 16),
 
                       // Error si existe
                       if (trackerState.lastError != null)
                         _buildErrorCard(trackerState.lastError!),
+
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 16),
-
-              // Botones de control
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: trackerState.isRunning
-                          ? () => notifier.sendNow()
-                          : null,
-                      icon: const Icon(Icons.send),
-                      label: const Text('Enviar'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        if (trackerState.isRunning) {
-                          notifier.stopTracking();
-                        } else {
-                          notifier.startTracking();
-                        }
-                      },
-                      icon: Icon(
-                        trackerState.isRunning
-                            ? Icons.stop_circle
-                            : Icons.play_circle,
-                      ),
-                      label: Text(
-                        trackerState.isRunning ? 'Detener' : 'Iniciar',
-                      ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                        backgroundColor: trackerState.isRunning
-                            ? Colors.red
-                            : Colors.green,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Contador de envíos
-              Center(
-                child: Text(
-                  'Posiciones enviadas: ${trackerState.sendCount}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ),
+              // Botones de control fijos abajo
+              _buildControlButtons(trackerState, notifier, isDark),
             ],
           ),
         ),
@@ -158,166 +148,396 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     );
   }
 
-  Widget _buildStatusCard(TrackerState state) {
-    final isRunning = state.isRunning;
-    final color = isRunning ? Colors.green : Colors.orange;
-
-    return Card(
-      color: color,
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          children: [
-            Icon(
-              isRunning ? Icons.location_searching : Icons.location_off,
-              size: 64,
-              color: Colors.white,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isRunning ? 'Rastreando' : 'Pausado',
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isRunning
-                  ? 'Enviando ubicación cada 30 segundos'
-                  : 'El rastreo está pausado',
-              style: const TextStyle(fontSize: 14, color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-            if (state.childName != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.child_care, size: 18, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Text(
-                      state.childName!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(TrackerState state) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Información',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildInfoRow(
-              Icons.access_time,
-              'Último envío',
-              state.lastSentAt != null
-                  ? _formatDateTime(state.lastSentAt!)
-                  : 'Nunca',
-            ),
-            const Divider(),
-            _buildInfoRow(
-              Icons.location_on,
-              'Ubicación',
-              state.lastLat != null && state.lastLng != null
-                  ? '${state.lastLat!.toStringAsFixed(4)}, ${state.lastLng!.toStringAsFixed(4)}'
-                  : 'Sin datos',
-            ),
-            const Divider(),
-            _buildInfoRow(
-              Icons.battery_std,
-              'Batería',
-              state.lastBattery != null ? '${state.lastBattery}%' : 'Sin datos',
-              trailing: state.lastBattery != null
-                  ? _getBatteryIcon(state.lastBattery!)
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(
-    IconData icon,
-    String label,
-    String value, {
-    Widget? trailing,
-  }) {
+  Widget _buildAppBar(
+    BuildContext context,
+    ThemeData theme,
+    TrackerNotifier notifier,
+  ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: Text(
+              'Modo Hijo',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          if (trailing != null) trailing,
+          IconButton(
+            onPressed: () => _showSettingsMenu(context, notifier),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: theme.colorScheme.onSurface,
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withOpacity(0.5),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  Widget _buildStatusCard(TrackerState state, bool isDark) {
+    final isRunning = state.isRunning;
+    final color = isRunning ? AppTheme.insideColor : AppTheme.warningColor;
+
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: isRunning ? _pulseAnimation.value : 1.0,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withBlue(color.blue + 30)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Icono con ring animado
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.2),
+                  ),
+                  child: Icon(
+                    isRunning
+                        ? Icons.location_searching
+                        : Icons.location_off_rounded,
+                    size: 40,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  isRunning ? 'Rastreando' : 'Pausado',
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isRunning
+                      ? 'Enviando ubicación cada 30 segundos'
+                      : 'El rastreo está pausado',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.85),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (state.childName != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.child_care_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          state.childName!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoCard(TrackerState state, ThemeData theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Información',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            icon: Icons.access_time_rounded,
+            label: 'Último envío',
+            value: state.lastSentAt != null
+                ? _formatDateTime(state.lastSentAt!)
+                : 'Nunca',
+            theme: theme,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1),
+          ),
+          _buildInfoRow(
+            icon: Icons.location_on_rounded,
+            label: 'Ubicación',
+            value: state.lastLat != null && state.lastLng != null
+                ? '${state.lastLat!.toStringAsFixed(4)}, ${state.lastLng!.toStringAsFixed(4)}'
+                : 'Sin datos',
+            theme: theme,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1),
+          ),
+          _buildInfoRow(
+            icon: Icons.battery_std_rounded,
+            label: 'Batería',
+            value: state.lastBattery != null
+                ? '${state.lastBattery}%'
+                : 'Sin datos',
+            theme: theme,
+            trailing: state.lastBattery != null
+                ? _getBatteryIcon(state.lastBattery!)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required ThemeData theme,
+    Widget? trailing,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: AppTheme.primaryColor),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    );
+  }
+
   Widget _buildErrorCard(String error) {
-    return Card(
-      color: Colors.red[50],
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red[700]),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                error,
-                style: TextStyle(color: Colors.red[900], fontSize: 12),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            color: Colors.red.shade600,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              error,
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButtons(
+    TrackerState state,
+    TrackerNotifier notifier,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2a2a4a).withOpacity(0.5) : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              // Botón enviar
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: state.isRunning
+                        ? () => notifier.sendNow()
+                        : null,
+                    icon: const Icon(Icons.send_rounded, size: 20),
+                    label: const Text(
+                      'Enviar',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryColor,
+                      side: BorderSide(
+                        color: AppTheme.primaryColor.withOpacity(0.5),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Botón iniciar/detener
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (state.isRunning) {
+                        notifier.stopTracking();
+                      } else {
+                        notifier.startTracking();
+                      }
+                    },
+                    icon: Icon(
+                      state.isRunning
+                          ? Icons.stop_circle_rounded
+                          : Icons.play_circle_rounded,
+                      size: 22,
+                    ),
+                    label: Text(
+                      state.isRunning ? 'Detener' : 'Iniciar',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: state.isRunning
+                          ? AppTheme.errorColor
+                          : AppTheme.insideColor,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      shadowColor:
+                          (state.isRunning
+                                  ? AppTheme.errorColor
+                                  : AppTheme.insideColor)
+                              .withOpacity(0.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Posiciones enviadas: ${state.sendCount}',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white54 : Colors.grey.shade600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -327,17 +547,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     IconData icon;
 
     if (level > 80) {
-      color = Colors.green;
-      icon = Icons.battery_full;
+      color = AppTheme.insideColor;
+      icon = Icons.battery_full_rounded;
     } else if (level > 50) {
-      color = Colors.green;
-      icon = Icons.battery_5_bar;
+      color = AppTheme.insideColor;
+      icon = Icons.battery_5_bar_rounded;
     } else if (level > 20) {
-      color = Colors.orange;
-      icon = Icons.battery_3_bar;
+      color = AppTheme.warningColor;
+      icon = Icons.battery_3_bar_rounded;
     } else {
-      color = Colors.red;
-      icon = Icons.battery_alert;
+      color = AppTheme.errorColor;
+      icon = Icons.battery_alert_rounded;
     }
 
     return Icon(icon, color: color, size: 20);
@@ -359,54 +579,109 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   void _showSettingsMenu(BuildContext context, TrackerNotifier notifier) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.refresh),
-              title: const Text('Reconfigurar dispositivo'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showReconfigureDialog(context, notifier);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text(
-                'Salir del modo hijo',
-                style: TextStyle(color: Colors.red),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              onTap: () async {
-                Navigator.pop(ctx);
-                await notifier.clearConfig();
-                if (mounted) {
-                  context.go('/mode');
-                }
-              },
-            ),
-          ],
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                title: const Text(
+                  'Reconfigurar dispositivo',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showReconfigureDialog(context, notifier);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.logout_rounded, color: AppTheme.errorColor),
+                ),
+                title: Text(
+                  'Salir del modo hijo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.errorColor,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await notifier.clearConfig();
+                  if (mounted) {
+                    context.go('/mode');
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   void _showReconfigureDialog(BuildContext context, TrackerNotifier notifier) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reconfigurar'),
+        backgroundColor: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Reconfigurar',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         content: const Text(
           '¿Deseas reconfigurar este dispositivo? Se detendrá el rastreo actual.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ),
-          FilledButton(
+          ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await notifier.clearConfig();
@@ -414,6 +689,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                 context.go('/child/setup');
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             child: const Text('Reconfigurar'),
           ),
         ],

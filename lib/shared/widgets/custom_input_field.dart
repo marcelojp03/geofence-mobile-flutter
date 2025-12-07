@@ -96,7 +96,7 @@ class _CustomInputFieldState extends State<CustomInputField> {
         AnimatedDefaultTextStyle(
           duration: const Duration(milliseconds: 200),
           style: TextStyle(
-            fontSize: r.dp(1.6),
+            fontSize: r.dp(1.4), // Reduced from 1.6
             fontWeight: _isFocused ? FontWeight.w600 : FontWeight.w500,
             color: hasError
                 ? theme.colorScheme.error
@@ -128,7 +128,7 @@ class _CustomInputFieldState extends State<CustomInputField> {
             onFieldSubmitted: widget.onFieldSubmitted,
             onChanged: widget.onChanged,
             style: TextStyle(
-              fontSize: r.dp(1.8),
+              fontSize: r.dp(1.6), // Reduced from 1.8
               color: isDark ? Colors.white : Colors.black87,
             ),
             decoration: InputDecoration(
@@ -142,14 +142,14 @@ class _CustomInputFieldState extends State<CustomInputField> {
                       color: _isFocused
                           ? theme.colorScheme.primary
                           : (isDark ? Colors.white54 : Colors.black45),
-                      size: r.dp(2.5),
+                      size: r.dp(2.2), // Reduced from 2.5
                     )
                   : null,
               suffixIcon: widget.suffixIcon,
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(
-                horizontal: r.wp(4),
-                vertical: r.hp(2),
+                horizontal: r.wp(3.5), // Reduced from 4
+                vertical: r.hp(1.6), // Reduced from 2
               ),
               isDense: true,
             ),
@@ -166,7 +166,7 @@ class _CustomInputFieldState extends State<CustomInputField> {
                     widget.errorMessage!,
                     style: TextStyle(
                       color: theme.colorScheme.error,
-                      fontSize: r.dp(1.4),
+                      fontSize: r.dp(1.2), // Reduced from 1.4
                       fontWeight: FontWeight.w500,
                     ),
                   ),

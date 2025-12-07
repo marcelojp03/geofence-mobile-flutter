@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:battery_plus/battery_plus.dart';
 import 'dart:developer' as developer;
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/device_service.dart';
 import '../../tracking/data/tracking_repository.dart';
@@ -110,6 +111,44 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
         'Background tracking auto-registered',
         name: 'TrackerNotifier',
       );
+
+      // Verificar si el tracking estaba activo
+      final wasTrackingActive = await _storage.isTrackingActive();
+      final isServiceRunning = await ForegroundTrackingService().isRunning();
+
+      developer.log(
+        'Tracking state: wasActive=$wasTrackingActive, serviceRunning=$isServiceRunning',
+        name: 'TrackerNotifier',
+      );
+
+      // Si el servicio sigue corriendo, actualizar el estado
+      if (isServiceRunning || wasTrackingActive) {
+        state = state.copyWith(
+          isLoading: false,
+          isConfigured: isConfigured,
+          isRunning: true,
+          childName: childName,
+          lastSentAt: lastSent,
+        );
+
+        // Asegurar que el servicio esté corriendo si estaba activo
+        if (wasTrackingActive && !isServiceRunning) {
+          await ForegroundTrackingService().startService();
+        }
+
+        // Reiniciar timer local
+        _timer?.cancel();
+        _timer = Timer.periodic(
+          const Duration(seconds: 30),
+          (_) => _sendPosition(),
+        );
+
+        developer.log(
+          'Tracking restored: isRunning=true',
+          name: 'TrackerNotifier',
+        );
+        return;
+      }
     }
 
     state = state.copyWith(
@@ -217,6 +256,12 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
 
     state = state.copyWith(isRunning: true, lastError: null);
 
+    // Guardar estado de tracking activo
+    await _storage.setTrackingActive(true);
+
+    // Analytics: registrar inicio de tracking
+    AnalyticsService().logTrackingStarted(childId: _childId);
+
     developer.log(
       'Starting tracking every ${interval.inSeconds}s',
       name: 'TrackerNotifier',
@@ -240,6 +285,15 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
   Future<void> stopTracking() async {
     _timer?.cancel();
     _timer = null;
+
+    // Guardar estado de tracking inactivo
+    await _storage.setTrackingActive(false);
+
+    // Analytics: registrar detención de tracking
+    AnalyticsService().logTrackingStopped(
+      childId: _childId,
+      positionsSent: state.sendCount,
+    );
 
     // Detener foreground service
     await ForegroundTrackingService().stopService();
@@ -268,13 +322,14 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
       final batteryLevel = await _battery.batteryLevel;
 
       // Enviar al servidor
+      // speed y heading solo si hay valor válido (> 0)
       final response = await _trackingRepository.sendPosition(
         deviceUid: _deviceUid!,
         lat: position.latitude,
         lng: position.longitude,
         accuracy: position.accuracy,
-        speed: position.speed,
-        heading: position.heading,
+        speed: position.speed > 0 ? position.speed : null,
+        heading: position.heading > 0 ? position.heading : null,
         altitude: position.altitude,
         batteryLevel: batteryLevel,
       );

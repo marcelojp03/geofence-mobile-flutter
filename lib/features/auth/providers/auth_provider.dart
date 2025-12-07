@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/analytics_service.dart';
 import '../data/auth_repository.dart';
 import '../domain/entities/entities.dart';
 
@@ -95,6 +96,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (response.isSuccess && response.data != null) {
         final loginData = response.data!;
         state = AuthState.authenticated(loginData.user);
+
+        // Analytics: registrar login exitoso
+        final analytics = AnalyticsService();
+        await analytics.logLogin(method: 'email');
+        await analytics.setUserId(loginData.user.id.toString());
+        await analytics.setUserRole(loginData.user.role.name);
+
         return true;
       } else {
         state = AuthState.unauthenticated(response.message);
@@ -142,6 +150,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     try {
       await _repository.logout();
+
+      // Analytics: registrar logout
+      final analytics = AnalyticsService();
+      await analytics.logLogout();
+      await analytics.setUserId(null);
+
       state = AuthState.unauthenticated();
     } catch (e) {
       // Aún así cerrar sesión localmente

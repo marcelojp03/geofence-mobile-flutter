@@ -9,6 +9,7 @@ class ChildModeStorage {
   static const String _childNameKey = 'child_mode_child_name';
   static const String _isConfiguredKey = 'child_mode_is_configured';
   static const String _lastSentKey = 'child_mode_last_sent';
+  static const String _isTrackingActiveKey = 'child_mode_is_tracking_active';
 
   /// Guarda la configuración del modo hijo
   Future<void> saveConfig({
@@ -65,6 +66,19 @@ class ChildModeStorage {
     return result;
   }
 
+  /// Guarda el estado del tracking (activo/inactivo)
+  Future<void> setTrackingActive(bool isActive) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isTrackingActiveKey, isActive);
+    developer.log('Tracking active saved: $isActive', name: 'ChildModeStorage');
+  }
+
+  /// Obtiene el estado del tracking
+  Future<bool> isTrackingActive() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_isTrackingActiveKey) ?? false;
+  }
+
   /// Guarda la última vez que se envió una posición
   Future<void> setLastSent(DateTime dateTime) async {
     final prefs = await SharedPreferences.getInstance();
@@ -87,5 +101,6 @@ class ChildModeStorage {
     await prefs.remove(_childNameKey);
     await prefs.remove(_isConfiguredKey);
     await prefs.remove(_lastSentKey);
+    await prefs.remove(_isTrackingActiveKey);
   }
 }

@@ -2,7 +2,7 @@
 class Device {
   final int id;
   final String deviceUid;
-  final String name;
+  final String? name;
   final String? model;
   final String? manufacturer;
   final String? osVersion;
@@ -16,7 +16,7 @@ class Device {
   const Device({
     required this.id,
     required this.deviceUid,
-    required this.name,
+    this.name,
     this.model,
     this.manufacturer,
     this.osVersion,
@@ -32,7 +32,7 @@ class Device {
     return Device(
       id: json['id'] as int,
       deviceUid: json['deviceUid'] as String? ?? '',
-      name: json['name'] as String,
+      name: json['name'] as String?,
       model: json['model'] as String?,
       manufacturer: json['manufacturer'] as String?,
       osVersion: json['osVersion'] as String?,
@@ -70,6 +70,9 @@ class Device {
   /// Formatea el nivel de batería
   String get batteryDisplay =>
       lastBatteryLevel != null ? '$lastBatteryLevel%' : 'N/A';
+
+  /// Nombre para mostrar
+  String get displayName => name ?? 'Dispositivo $id';
 
   @override
   String toString() => 'Device(id: $id, name: $name, model: $model)';
