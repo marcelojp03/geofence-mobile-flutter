@@ -131,20 +131,20 @@ class LoginScreen extends ConsumerWidget {
                             // Formulario
                             const _LoginForm(),
 
-                            const Spacer(),
+                            // const Spacer(),
 
-                            // Footer
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 24),
-                              child: Text(
-                                '¿Problemas para acceder? Contacta soporte',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant
-                                      .withOpacity(0.6),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
+                            // // Footer
+                            // Padding(
+                            //   padding: const EdgeInsets.only(bottom: 24),
+                            //   child: Text(
+                            //     '¿Problemas para acceder? Contacta soporte',
+                            //     style: theme.textTheme.bodySmall?.copyWith(
+                            //       color: theme.colorScheme.onSurfaceVariant
+                            //           .withOpacity(0.6),
+                            //     ),
+                            //     textAlign: TextAlign.center,
+                            //   ),
+                            // ),
                           ],
                         ),
                       ),

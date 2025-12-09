@@ -1,3 +1,20 @@
+/// Tipo de propietario del dispositivo
+enum DeviceOwnerType {
+  child('CHILD'),
+  parent('PARENT');
+
+  final String value;
+  const DeviceOwnerType(this.value);
+
+  static DeviceOwnerType fromString(String? value) {
+    if (value == null) return DeviceOwnerType.child;
+    return DeviceOwnerType.values.firstWhere(
+      (t) => t.value == value,
+      orElse: () => DeviceOwnerType.child,
+    );
+  }
+}
+
 /// Entidad de Dispositivo
 class Device {
   final int id;
@@ -12,6 +29,7 @@ class Device {
   final DateTime? lastSeen;
   final int? childId;
   final String status;
+  final DeviceOwnerType ownerType;
 
   const Device({
     required this.id,
@@ -26,6 +44,7 @@ class Device {
     this.lastSeen,
     this.childId,
     this.status = 'ACTIVE',
+    this.ownerType = DeviceOwnerType.child,
   });
 
   factory Device.fromJson(Map<String, dynamic> json) {
@@ -44,6 +63,7 @@ class Device {
           : null,
       childId: json['childId'] as int?,
       status: json['status'] as String? ?? 'ACTIVE',
+      ownerType: DeviceOwnerType.fromString(json['ownerType'] as String?),
     );
   }
 
@@ -66,6 +86,12 @@ class Device {
 
   /// Verifica si el dispositivo está vinculado a un hijo
   bool get isLinked => childId != null;
+
+  /// Verifica si es un dispositivo del hijo (no del padre)
+  bool get isChildDevice => ownerType == DeviceOwnerType.child;
+
+  /// Verifica si es un dispositivo del padre
+  bool get isParentDevice => ownerType == DeviceOwnerType.parent;
 
   /// Formatea el nivel de batería
   String get batteryDisplay =>

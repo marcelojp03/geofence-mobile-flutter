@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +23,7 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen>
     with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   bool _isScanning = false;
+  bool _isProcessingQR = false; // Prevenir detecciones múltiples
   String? _deviceInfo;
   String? _errorMessage;
   MobileScannerController? _scannerController;
@@ -85,23 +87,38 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen>
   }
 
   Future<void> _onQRDetected(BarcodeCapture capture) async {
-    if (_isLoading) return;
+    // Prevenir detecciones múltiples
+    if (_isLoading || _isProcessingQR) return;
+    _isProcessingQR = true;
 
     final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
+    if (barcodes.isEmpty) {
+      _isProcessingQR = false;
+      return;
+    }
 
     final String? code = barcodes.first.rawValue;
-    if (code == null) return;
+    if (code == null) {
+      _isProcessingQR = false;
+      return;
+    }
 
     _stopScanning();
 
     try {
+      developer.log('QR code detected: $code', name: 'ChildSetup');
       final data = jsonDecode(code) as Map<String, dynamic>;
       final childId = data['childId'] as int?;
       final childName = data['childName'] as String?;
       final schoolId = data['schoolId'] as int?;
 
+      developer.log(
+        'Parsed QR: childId=$childId, childName=$childName, schoolId=$schoolId',
+        name: 'ChildSetup',
+      );
+
       if (childId == null || childName == null || schoolId == null) {
+        _isProcessingQR = false;
         setState(() {
           _errorMessage =
               'Código QR inválido. Genera uno nuevo desde la app de padres.';
@@ -115,6 +132,8 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen>
         schoolId: schoolId,
       );
     } catch (e) {
+      developer.log('QR parse error: $e', name: 'ChildSetup');
+      _isProcessingQR = false;
       setState(() {
         _errorMessage = 'No se pudo leer el código QR. Intenta de nuevo.';
       });
@@ -131,22 +150,41 @@ class _ChildSetupScreenState extends ConsumerState<ChildSetupScreen>
       _errorMessage = null;
     });
 
+    developer.log('Configuring device...', name: 'ChildSetup');
+
     final success = await ref
         .read(trackerNotifierProvider.notifier)
         .configure(childId: childId, childName: childName, schoolId: schoolId);
 
+    developer.log(
+      'Configure result: $success, mounted: $mounted',
+      name: 'ChildSetup',
+    );
+
+    if (!mounted) return;
+
     setState(() => _isLoading = false);
 
-    if (success && mounted) {
-      final analytics = AnalyticsService();
-      await analytics.logQrScanned(success: true);
-      await analytics.logChildLinked(childId: childId, schoolId: schoolId);
-      context.go('/child/tracking');
+    if (success) {
+      // Analytics en try-catch para que no afecte el flujo principal
+      try {
+        final analytics = AnalyticsService();
+        await analytics.logQrScanned(success: true);
+        await analytics.logChildLinked(childId: childId, schoolId: schoolId);
+      } catch (e) {
+        developer.log('Analytics error (ignored): $e', name: 'ChildSetup');
+      }
+      developer.log('Navigating to /child/tracking', name: 'ChildSetup');
+      if (mounted) context.go('/child/tracking');
     } else {
-      await AnalyticsService().logQrScanned(
-        success: false,
-        error: 'configuration_failed',
-      );
+      try {
+        await AnalyticsService().logQrScanned(
+          success: false,
+          error: 'configuration_failed',
+        );
+      } catch (e) {
+        developer.log('Analytics error (ignored): $e', name: 'ChildSetup');
+      }
       if (mounted) {
         setState(() {
           _errorMessage = 'Error al configurar dispositivo. Intenta de nuevo.';

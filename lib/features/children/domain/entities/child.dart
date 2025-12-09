@@ -1,4 +1,5 @@
 import 'device.dart';
+import '../../../tracking/domain/entities/child_current_location.dart';
 
 /// Estado del hijo
 enum ChildStatus {
@@ -25,7 +26,10 @@ class Child {
   final ChildStatus status;
   final int? parentId;
   final int? schoolId;
-  final List<Device>? devices;
+  final List<Device>? devices; // Legacy: array de dispositivos
+  final Device? device; // Nuevo: dispositivo CHILD singular
+  final DeviceStatus? deviceStatus; // Nuevo: estado del dispositivo
+  final int? minutesSinceLastSeen; // Nuevo: minutos desde última conexión
   final DateTime? createdAt;
 
   const Child({
@@ -37,10 +41,34 @@ class Child {
     this.parentId,
     this.schoolId,
     this.devices,
+    this.device,
+    this.deviceStatus,
+    this.minutesSinceLastSeen,
     this.createdAt,
   });
 
   factory Child.fromJson(Map<String, dynamic> json) {
+    // Parsear deviceStatus si existe
+    DeviceStatus? deviceStatusEnum;
+    final deviceStatusStr = json['deviceStatus'] as String?;
+    if (deviceStatusStr != null) {
+      switch (deviceStatusStr) {
+        case 'online':
+          deviceStatusEnum = DeviceStatus.online;
+          break;
+        case 'recent':
+          deviceStatusEnum = DeviceStatus.recent;
+          break;
+        case 'no_signal':
+          deviceStatusEnum = DeviceStatus.noSignal;
+          break;
+        case 'no_device':
+        default:
+          deviceStatusEnum = DeviceStatus.noDevice;
+          break;
+      }
+    }
+
     return Child(
       id: json['id'] as int,
       fullName: json['fullName'] as String,
@@ -49,11 +77,18 @@ class Child {
       status: ChildStatus.fromString(json['status'] as String? ?? 'ACTIVE'),
       parentId: json['parentId'] as int?,
       schoolId: json['schoolId'] as int?,
+      // Soportar legacy 'devices' array
       devices: json['devices'] != null
           ? (json['devices'] as List)
                 .map((d) => Device.fromJson(d as Map<String, dynamic>))
                 .toList()
           : null,
+      // Nuevo: 'device' singular
+      device: json['device'] != null
+          ? Device.fromJson(json['device'] as Map<String, dynamic>)
+          : null,
+      deviceStatus: deviceStatusEnum,
+      minutesSinceLastSeen: json['minutesSinceLastSeen'] as int?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
@@ -82,11 +117,29 @@ class Child {
     return fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
   }
 
-  /// Verifica si tiene dispositivo vinculado
-  bool get hasDevice => devices != null && devices!.isNotEmpty;
+  /// Obtiene solo los dispositivos del hijo (no los del padre) - Legacy
+  List<Device> get childDevices =>
+      devices?.where((d) => d.isChildDevice).toList() ?? [];
 
-  /// Obtiene el dispositivo principal (primero de la lista)
-  Device? get primaryDevice => hasDevice ? devices!.first : null;
+  /// Verifica si tiene dispositivo del hijo vinculado
+  /// Usa el nuevo campo 'device' o fallback a 'devices' legacy
+  bool get hasDevice {
+    // Primero verificar deviceStatus si existe
+    if (deviceStatus != null) {
+      return deviceStatus != DeviceStatus.noDevice;
+    }
+    // Fallback: usar 'device' singular
+    if (device != null) return true;
+    // Fallback legacy: usar 'devices' array
+    return childDevices.isNotEmpty;
+  }
+
+  /// Obtiene el dispositivo principal del hijo
+  /// Usa el nuevo campo 'device' o fallback a 'devices' legacy
+  Device? get primaryDevice {
+    if (device != null) return device;
+    return childDevices.isNotEmpty ? childDevices.first : null;
+  }
 
   /// Nivel de batería del dispositivo principal
   int? get batteryLevel => primaryDevice?.lastBatteryLevel;
@@ -100,6 +153,9 @@ class Child {
     int? parentId,
     int? schoolId,
     List<Device>? devices,
+    Device? device,
+    DeviceStatus? deviceStatus,
+    int? minutesSinceLastSeen,
   }) {
     return Child(
       id: id ?? this.id,
@@ -110,6 +166,9 @@ class Child {
       parentId: parentId ?? this.parentId,
       schoolId: schoolId ?? this.schoolId,
       devices: devices ?? this.devices,
+      device: device ?? this.device,
+      deviceStatus: deviceStatus ?? this.deviceStatus,
+      minutesSinceLastSeen: minutesSinceLastSeen ?? this.minutesSinceLastSeen,
     );
   }
 

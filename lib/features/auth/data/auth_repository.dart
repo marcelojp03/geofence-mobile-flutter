@@ -144,7 +144,10 @@ class AuthRepository {
   Future<bool> checkSession() async {
     try {
       final token = await getToken();
-      if (token == null || token.isEmpty) return false;
+      if (token == null || token.isEmpty) {
+        developer.log('checkSession: no token found', name: 'AuthRepository');
+        return false;
+      }
 
       _api.setToken(token);
 
@@ -152,40 +155,27 @@ class AuthRepository {
       final response = await getProfile();
       return response.isSuccess;
     } catch (e) {
+      developer.log('checkSession: error $e', name: 'AuthRepository');
       return false;
     }
   }
 
-  /// Verifica si hay una sesión activa
+  /// Verifica si hay una sesión activa (solo chequea si existe token)
   Future<bool> isAuthenticated() async {
     final token = await getToken();
-    final result = token != null && token.isNotEmpty;
-    developer.log(
-      'isAuthenticated: $result (token exists: ${token != null})',
-      name: 'AuthRepository',
-    );
-    return result;
+    return token != null && token.isNotEmpty;
   }
 
   /// Obtiene el token guardado
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(Env.tokenKey);
-    developer.log(
-      'getToken: ${token != null ? 'found (${token.length} chars)' : 'not found'}',
-      name: 'AuthRepository',
-    );
-    return token;
+    return prefs.getString(Env.tokenKey);
   }
 
   /// Guarda el token en SharedPreferences
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    final success = await prefs.setString(Env.tokenKey, token);
-    developer.log(
-      'Token saved: $success (key: ${Env.tokenKey})',
-      name: 'AuthRepository',
-    );
+    await prefs.setString(Env.tokenKey, token);
   }
 
   /// Maneja errores de Dio

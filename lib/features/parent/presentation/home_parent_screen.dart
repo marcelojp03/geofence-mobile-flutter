@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -230,14 +231,15 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
   }
 
   Widget _buildHomeTab() {
-    final childrenAsync = ref.watch(myChildrenProvider);
+    // Usar el provider de tracking que tiene info actualizada de deviceStatus/locationStatus
+    final locationsAsync = ref.watch(childrenCurrentLocationsProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(myChildrenProvider);
+        ref.invalidate(childrenCurrentLocationsProvider);
         ref.invalidate(unreadAlertsCountProvider);
       },
-      child: childrenAsync.when(
+      child: locationsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Padding(
@@ -259,7 +261,8 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: () => ref.invalidate(myChildrenProvider),
+                  onPressed: () =>
+                      ref.invalidate(childrenCurrentLocationsProvider),
                   icon: const Icon(Icons.refresh),
                   label: const Text('Reintentar'),
                 ),
@@ -267,8 +270,8 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
             ),
           ),
         ),
-        data: (children) {
-          if (children.isEmpty) {
+        data: (locations) {
+          if (locations.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -296,12 +299,12 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               // Resumen de estados
-              _buildSummaryCard(children),
+              _buildSummaryCardFromLocations(locations),
 
               const SizedBox(height: 24),
 
               Text(
-                'Mis Hijos (${children.length})',
+                'Mis Hijos (${locations.length})',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -311,10 +314,10 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
               const SizedBox(height: 12),
 
               // Lista de hijos
-              ...children.map(
-                (child) => Padding(
+              ...locations.map(
+                (location) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildChildCard(child),
+                  child: _buildChildCardFromLocation(location),
                 ),
               ),
             ],
@@ -324,24 +327,15 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
     );
   }
 
-  Widget _buildSummaryCard(List<Child> children) {
-    // Contar estados basados en la última actividad de dispositivos
+  Widget _buildSummaryCardFromLocations(List<ChildCurrentLocation> locations) {
+    // Contar estados basados en deviceStatus
     int withSignal = 0;
     int noSignal = 0;
 
-    for (final child in children) {
-      if (child.devices != null && child.devices!.isNotEmpty) {
-        final device = child.devices!.first;
-        if (device.lastSeen != null) {
-          final diff = DateTime.now().difference(device.lastSeen!);
-          if (diff.inMinutes < 10) {
-            withSignal++;
-          } else {
-            noSignal++;
-          }
-        } else {
-          noSignal++;
-        }
+    for (final location in locations) {
+      // hasSignal es true si deviceStatus es online o recent
+      if (location.hasSignal) {
+        withSignal++;
       } else {
         noSignal++;
       }
@@ -369,7 +363,7 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
             Container(width: 1, height: 50, color: Colors.grey[300]),
             _buildStatColumn(
               'Total',
-              '${children.length}',
+              '${locations.length}',
               Colors.blue,
               Icons.group,
             ),
@@ -403,39 +397,40 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
     );
   }
 
-  Widget _buildChildCard(Child child) {
-    final device = child.devices?.isNotEmpty == true
-        ? child.devices!.first
-        : null;
-    final lastSeen = device?.lastSeen;
-    final battery = device?.lastBatteryLevel;
-    final isRecent =
-        lastSeen != null && DateTime.now().difference(lastSeen).inMinutes < 10;
-
-    // Determinar estado del niño
+  Widget _buildChildCardFromLocation(ChildCurrentLocation location) {
+    // Determinar estado del niño basado en deviceStatus
     String statusText;
     Color statusColor;
     IconData statusIcon;
 
-    if (device == null || lastSeen == null) {
-      statusText = 'Sin dispositivo';
-      statusColor = Colors.grey;
-      statusIcon = Icons.device_unknown;
-    } else if (!isRecent) {
-      statusText = 'Sin señal';
-      statusColor = Colors.orange;
-      statusIcon = Icons.signal_cellular_off;
-    } else {
-      statusText = 'Conectado';
-      statusColor = Colors.green;
-      statusIcon = Icons.signal_cellular_alt;
+    switch (location.deviceStatus) {
+      case DeviceStatus.online:
+        statusText = 'En línea';
+        statusColor = Colors.green;
+        statusIcon = Icons.signal_cellular_alt;
+        break;
+      case DeviceStatus.recent:
+        statusText = location.deviceStatusLabel; // "Hace Xmin"
+        statusColor = Colors.green.shade700;
+        statusIcon = Icons.signal_cellular_alt;
+        break;
+      case DeviceStatus.noSignal:
+        statusText = 'Sin señal';
+        statusColor = Colors.orange;
+        statusIcon = Icons.signal_cellular_off;
+        break;
+      case DeviceStatus.noDevice:
+        statusText = 'Sin dispositivo';
+        statusColor = Colors.grey;
+        statusIcon = Icons.device_unknown;
+        break;
     }
 
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          context.push('/children/${child.id}');
+          context.push('/children/${location.childId}');
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -448,7 +443,7 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
                     radius: 28,
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     child: Text(
-                      child.fullName[0].toUpperCase(),
+                      location.fullName[0].toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -485,7 +480,7 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            child.fullName,
+                            location.fullName,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -521,9 +516,44 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      child.grade.isNotEmpty ? child.grade : 'Sin grado',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    // Grado + ubicación
+                    Row(
+                      children: [
+                        Text(
+                          location.grade?.isNotEmpty == true
+                              ? location.grade!
+                              : 'Sin grado',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (location.hasSignal) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            location.locationStatus == LocationStatus.inside
+                                ? Icons.school
+                                : Icons.location_off,
+                            size: 14,
+                            color:
+                                location.locationStatus == LocationStatus.inside
+                                ? Colors.green
+                                : Colors.orange,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            location.locationStatusLabel,
+                            style: TextStyle(
+                              color:
+                                  location.locationStatus ==
+                                      LocationStatus.inside
+                                  ? Colors.green
+                                  : Colors.orange,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 8),
                     // Info de última conexión y batería
@@ -536,27 +566,27 @@ class _HomeParentScreenState extends ConsumerState<HomeParentScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          lastSeen != null
-                              ? _formatLastSeen(lastSeen)
-                              : 'Sin conexión',
+                          location.timeAgo,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
                           ),
                         ),
-                        if (battery != null) ...[
+                        if (location.batteryLevel != null) ...[
                           const SizedBox(width: 16),
                           Icon(
-                            _getBatteryIcon(battery),
+                            _getBatteryIcon(location.batteryLevel!),
                             size: 14,
-                            color: battery > 20 ? Colors.grey[500] : Colors.red,
+                            color: location.batteryLevel! > 20
+                                ? Colors.grey[500]
+                                : Colors.red,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '$battery%',
+                            '${location.batteryLevel}%',
                             style: TextStyle(
                               fontSize: 12,
-                              color: battery > 20
+                              color: location.batteryLevel! > 20
                                   ? Colors.grey[600]
                                   : Colors.red,
                             ),
@@ -878,6 +908,24 @@ class _ChildrenMapView extends ConsumerStatefulWidget {
 class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
   final MapController _mapController = MapController();
   ChildCurrentLocation? _selectedLocation;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-refresh cada 30 segundos
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        ref.invalidate(childrenCurrentLocationsProvider);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1061,29 +1109,47 @@ class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
               margin: const EdgeInsets.all(32),
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 10,
                   ),
                 ],
               ),
-              child: const Column(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.location_off, size: 48, color: Colors.grey),
-                  SizedBox(height: 16),
+                  Icon(
+                    Icons.location_off,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     'Sin ubicaciones disponibles',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     'Los dispositivos de tus hijos aún no han enviado su ubicación',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: () {
+                      ref.invalidate(childrenCurrentLocationsProvider);
+                    },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Actualizar'),
                   ),
                 ],
               ),
@@ -1097,11 +1163,11 @@ class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 8,
                 ),
               ],
@@ -1124,9 +1190,12 @@ class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'Zona escolar',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                     ],
                   ),
@@ -1144,7 +1213,13 @@ class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('En el colegio', style: TextStyle(fontSize: 12)),
+                    Text(
+                      'En el colegio',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -1160,9 +1235,12 @@ class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Fuera del colegio',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ],
                 ),
@@ -1179,7 +1257,13 @@ class _ChildrenMapViewState extends ConsumerState<_ChildrenMapView> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('Sin señal', style: TextStyle(fontSize: 12)),
+                    Text(
+                      'Sin señal',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ],
                 ),
               ],

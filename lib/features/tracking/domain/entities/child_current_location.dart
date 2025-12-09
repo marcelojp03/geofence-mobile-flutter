@@ -1,5 +1,19 @@
-/// Estado de ubicación actual de un hijo
-/// Incluye información enriquecida del backend (hasSignal, status, etc.)
+/// Estado del dispositivo del hijo
+enum DeviceStatus {
+  noDevice, // Sin dispositivo vinculado
+  online, // En línea (lastSeen ≤ 5 min)
+  recent, // Hace poco (lastSeen 5-30 min)
+  noSignal, // Sin señal (lastSeen > 30 min)
+}
+
+/// Estado de ubicación del hijo
+enum LocationStatus {
+  inside, // Dentro del geofence
+  outside, // Fuera del geofence
+  unknown, // Sin datos (no_device o no_signal)
+}
+
+/// Estado de ubicación actual de un hijo (LEGACY - mantener compatibilidad)
 enum ChildLocationStatus {
   inside, // Dentro del geofence
   outside, // Fuera del geofence
@@ -20,6 +34,11 @@ class ChildCurrentLocation {
   final ChildLocationStatus status;
   final int? minutesSinceUpdate;
 
+  // Nuevos campos del backend
+  final DeviceStatus deviceStatus;
+  final LocationStatus locationStatus;
+  final int? minutesSinceDeviceSeen;
+
   const ChildCurrentLocation({
     required this.childId,
     required this.fullName,
@@ -33,23 +52,83 @@ class ChildCurrentLocation {
     required this.hasSignal,
     required this.status,
     this.minutesSinceUpdate,
+    this.deviceStatus = DeviceStatus.noDevice,
+    this.locationStatus = LocationStatus.unknown,
+    this.minutesSinceDeviceSeen,
   });
 
   factory ChildCurrentLocation.fromJson(Map<String, dynamic> json) {
-    // Parsear status string a enum
-    ChildLocationStatus statusEnum;
-    final statusStr = json['status'] as String?;
-    switch (statusStr) {
-      case 'inside':
-        statusEnum = ChildLocationStatus.inside;
+    // Parsear deviceStatus (nuevo)
+    DeviceStatus deviceStatusEnum;
+    final deviceStatusStr = json['deviceStatus'] as String?;
+    switch (deviceStatusStr) {
+      case 'online':
+        deviceStatusEnum = DeviceStatus.online;
         break;
-      case 'outside':
-        statusEnum = ChildLocationStatus.outside;
+      case 'recent':
+        deviceStatusEnum = DeviceStatus.recent;
         break;
       case 'no_signal':
-      default:
-        statusEnum = ChildLocationStatus.noSignal;
+        deviceStatusEnum = DeviceStatus.noSignal;
         break;
+      case 'no_device':
+      default:
+        deviceStatusEnum = DeviceStatus.noDevice;
+        break;
+    }
+
+    // Parsear locationStatus (nuevo)
+    LocationStatus locationStatusEnum;
+    final locationStatusStr = json['locationStatus'] as String?;
+    switch (locationStatusStr) {
+      case 'inside':
+        locationStatusEnum = LocationStatus.inside;
+        break;
+      case 'outside':
+        locationStatusEnum = LocationStatus.outside;
+        break;
+      case 'unknown':
+      default:
+        locationStatusEnum = LocationStatus.unknown;
+        break;
+    }
+
+    // Parsear status string a enum (legacy) - derivar de los nuevos campos si no existe
+    ChildLocationStatus statusEnum;
+    final statusStr = json['status'] as String?;
+    if (statusStr != null) {
+      // Si el backend envía el campo legacy, usarlo
+      switch (statusStr) {
+        case 'inside':
+          statusEnum = ChildLocationStatus.inside;
+          break;
+        case 'outside':
+          statusEnum = ChildLocationStatus.outside;
+          break;
+        case 'no_signal':
+        default:
+          statusEnum = ChildLocationStatus.noSignal;
+          break;
+      }
+    } else {
+      // Derivar desde deviceStatus y locationStatus
+      if (deviceStatusEnum == DeviceStatus.noDevice ||
+          deviceStatusEnum == DeviceStatus.noSignal) {
+        statusEnum = ChildLocationStatus.noSignal;
+      } else {
+        // Tiene señal (online o recent), usar locationStatus
+        switch (locationStatusEnum) {
+          case LocationStatus.inside:
+            statusEnum = ChildLocationStatus.inside;
+            break;
+          case LocationStatus.outside:
+            statusEnum = ChildLocationStatus.outside;
+            break;
+          case LocationStatus.unknown:
+            statusEnum = ChildLocationStatus.noSignal;
+            break;
+        }
+      }
     }
 
     return ChildCurrentLocation(
@@ -60,13 +139,22 @@ class ChildCurrentLocation {
       lng: (json['lng'] as num?)?.toDouble(),
       accuracy: (json['accuracy'] as num?)?.toDouble(),
       batteryLevel: json['batteryLevel'] as int?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
+      // Soportar tanto el nuevo 'lastPositionAt' como el legacy 'createdAt'
+      createdAt: (json['lastPositionAt'] ?? json['createdAt']) != null
+          ? DateTime.parse(
+              (json['lastPositionAt'] ?? json['createdAt']) as String,
+            )
           : null,
       isInsideGeofence: json['isInsideGeofence'] as bool?,
-      hasSignal: json['hasSignal'] as bool? ?? false,
+      // hasSignal ahora se calcula desde deviceStatus
+      hasSignal:
+          deviceStatusEnum != DeviceStatus.noDevice &&
+          deviceStatusEnum != DeviceStatus.noSignal,
       status: statusEnum,
       minutesSinceUpdate: json['minutesSinceUpdate'] as int?,
+      deviceStatus: deviceStatusEnum,
+      locationStatus: locationStatusEnum,
+      minutesSinceDeviceSeen: json['minutesSinceDeviceSeen'] as int?,
     );
   }
 
@@ -93,7 +181,13 @@ class ChildCurrentLocation {
   /// Verifica si la posición es reciente (menos de 5 minutos)
   bool get isRecent => minutesSinceUpdate != null && minutesSinceUpdate! < 5;
 
-  /// Color del estado para UI
+  /// Verifica si tiene dispositivo vinculado
+  bool get hasDevice => deviceStatus != DeviceStatus.noDevice;
+
+  /// Verifica si está en línea
+  bool get isOnline => deviceStatus == DeviceStatus.online;
+
+  /// Color del estado para UI (legacy)
   String get statusLabel {
     switch (status) {
       case ChildLocationStatus.inside:
@@ -102,6 +196,35 @@ class ChildCurrentLocation {
         return 'Fuera del colegio';
       case ChildLocationStatus.noSignal:
         return 'Sin señal';
+    }
+  }
+
+  /// Label del estado del dispositivo (nuevo)
+  String get deviceStatusLabel {
+    switch (deviceStatus) {
+      case DeviceStatus.noDevice:
+        return 'Sin dispositivo';
+      case DeviceStatus.online:
+        return 'En línea';
+      case DeviceStatus.recent:
+        if (minutesSinceDeviceSeen != null) {
+          return 'Hace ${minutesSinceDeviceSeen}min';
+        }
+        return 'Hace poco';
+      case DeviceStatus.noSignal:
+        return 'Sin señal';
+    }
+  }
+
+  /// Label del estado de ubicación (nuevo)
+  String get locationStatusLabel {
+    switch (locationStatus) {
+      case LocationStatus.inside:
+        return 'En el colegio';
+      case LocationStatus.outside:
+        return 'Fuera del colegio';
+      case LocationStatus.unknown:
+        return 'Ubicación desconocida';
     }
   }
 

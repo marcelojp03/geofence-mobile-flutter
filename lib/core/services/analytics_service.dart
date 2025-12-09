@@ -183,7 +183,10 @@ class AnalyticsService {
   Future<void> logQrScanned({bool success = true, String? error}) async {
     await _analytics.logEvent(
       name: 'qr_scanned',
-      parameters: {'success': success, if (error != null) 'error': error},
+      parameters: {
+        'success': success ? 1 : 0, // Firebase solo acepta String o num
+        if (error != null) 'error': error,
+      },
     );
     debugPrint('📊 [Analytics] qr_scanned: success=$success');
   }

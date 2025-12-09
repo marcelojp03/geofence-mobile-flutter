@@ -128,21 +128,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     // 2. Verificar si hay sesión de padre activa
     final authRepository = AuthRepository();
-    final isAuthenticated = await authRepository.isAuthenticated();
-    developer.log('Parent authenticated: $isAuthenticated', name: 'Splash');
 
-    if (isAuthenticated) {
-      final profileResponse = await authRepository.getProfile();
-      developer.log(
-        'Profile response success: ${profileResponse.success}',
-        name: 'Splash',
-      );
-      if (profileResponse.success) {
-        developer.log('Navigating to /parent', name: 'Splash');
-        if (mounted) context.go('/parent');
-        return;
-      }
-      await authRepository.logout();
+    // Usar checkSession() que carga el token en ApiClient Y verifica con /auth/me
+    final isValidSession = await authRepository.checkSession();
+    developer.log('Parent session valid: $isValidSession', name: 'Splash');
+
+    if (isValidSession) {
+      developer.log('Navigating to /parent', name: 'Splash');
+      if (mounted) context.go('/parent');
+      return;
     }
 
     // 3. No hay configuración previa, mostrar selector de modo

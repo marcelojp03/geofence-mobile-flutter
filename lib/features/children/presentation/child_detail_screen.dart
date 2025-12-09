@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../children/providers/children_provider.dart';
 import '../../tracking/providers/tracking_provider.dart';
 import '../../alerts/providers/alerts_provider.dart';
 import '../../alerts/domain/entities/alert.dart';
+import '../../schools/providers/schools_provider.dart';
 import '../domain/entities/child.dart';
 import '../../../config/theme/app_theme.dart';
 
@@ -24,6 +26,24 @@ class ChildDetailScreen extends ConsumerStatefulWidget {
 
 class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   final MapController _mapController = MapController();
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-refresh cada 30 segundos
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        ref.invalidate(childLastPositionProvider(widget.childId));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +72,10 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
         actions: [
           childAsync.when(
             data: (child) => IconButton(
-              icon: Icon(Icons.qr_code_rounded, color: AppTheme.primaryColor),
+              icon: Icon(
+                Icons.qr_code_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               tooltip: 'Vincular dispositivo',
               onPressed: () => _showQRDialog(context, child, isDark),
             ),
@@ -74,147 +97,10 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
       ),
       body: Column(
         children: [
-          // Mapa con la última posición
+          // Mapa con la última posición y geofence
           Expanded(
             flex: 2,
-            child: positionAsync.when(
-              data: (position) {
-                if (position == null) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.location_off, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text(
-                          'Sin ubicación registrada',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final latLng = LatLng(position.lat, position.lng);
-
-                return Stack(
-                  children: [
-                    FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: latLng,
-                        initialZoom: 16.0,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.geofence.app',
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: latLng,
-                              width: 50,
-                              height: 50,
-                              child: const Icon(
-                                Icons.location_pin,
-                                color: Colors.red,
-                                size: 50,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    // Info de la última posición
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF2a2a4a)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time_rounded,
-                              size: 18,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Última actualización: ${position.timeAgo}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                            if (position.batteryLevel != null) ...[
-                              Icon(
-                                _getBatteryIcon(position.batteryLevel!),
-                                size: 18,
-                                color: position.batteryLevel! > 20
-                                    ? AppTheme.insideColor
-                                    : AppTheme.errorColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${position.batteryLevel}%',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: position.batteryLevel! > 20
-                                      ? AppTheme.insideColor
-                                      : AppTheme.errorColor,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Botón para centrar mapa
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: FloatingActionButton.small(
-                        heroTag: 'center_map',
-                        onPressed: () {
-                          _mapController.move(latLng, 16.0);
-                        },
-                        child: const Icon(Icons.my_location),
-                      ),
-                    ),
-                  ],
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text('Error: $e'),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildMapSection(context, positionAsync, theme, isDark),
           ),
 
           // Lista de alertas recientes
@@ -303,6 +189,178 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Construye la sección del mapa con la posición del hijo y el geofence del colegio
+  Widget _buildMapSection(
+    BuildContext context,
+    AsyncValue<dynamic> positionAsync,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    // Obtener el geofence del colegio
+    final schoolGeofenceAsync = ref.watch(currentSchoolGeofenceProvider);
+
+    return positionAsync.when(
+      data: (position) {
+        if (position == null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.location_off,
+                  size: 64,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Sin ubicación registrada',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final latLng = LatLng(position.lat, position.lng);
+
+        // Construir polígono del geofence si existe
+        final List<Polygon> geofencePolygons = [];
+        schoolGeofenceAsync.whenData((school) {
+          if (school != null && school.hasGeofence) {
+            geofencePolygons.add(
+              Polygon(
+                points: school.geofence!.coordinates,
+                color: Colors.blue.withValues(alpha: 0.2),
+                borderColor: Colors.blue,
+                borderStrokeWidth: 3,
+              ),
+            );
+          }
+        });
+
+        return Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: latLng,
+                initialZoom: 16.0,
+                minZoom: 10,
+                maxZoom: 18,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.geofence.app',
+                ),
+                // Capa del geofence (polígono del colegio)
+                if (geofencePolygons.isNotEmpty)
+                  PolygonLayer(polygons: geofencePolygons),
+                // Marcador de ubicación del hijo
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: latLng,
+                      width: 50,
+                      height: 50,
+                      child: const Icon(
+                        Icons.location_pin,
+                        color: Colors.red,
+                        size: 50,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            // Info de la última posición
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2a2a4a) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.access_time_rounded,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Última actualización: ${position.timeAgo}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (position.batteryLevel != null) ...[
+                      Icon(
+                        _getBatteryIcon(position.batteryLevel!),
+                        size: 18,
+                        color: position.batteryLevel! > 20
+                            ? AppTheme.insideColor
+                            : AppTheme.errorColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${position.batteryLevel}%',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: position.batteryLevel! > 20
+                              ? AppTheme.insideColor
+                              : AppTheme.errorColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Botón para centrar mapa
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: FloatingActionButton.small(
+                heroTag: 'center_map',
+                onPressed: () {
+                  _mapController.move(latLng, 16.0);
+                },
+                child: const Icon(Icons.my_location),
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error: $e'),
+          ],
+        ),
       ),
     );
   }

@@ -215,6 +215,7 @@ class TrackerNotifier extends StateNotifier<TrackerState> {
       );
 
       state = state.copyWith(
+        isLoading: false,
         isConfigured: true,
         childName: actualChildName,
         lastError: null,
